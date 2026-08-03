@@ -1,8 +1,8 @@
 # reup-translate-node
 
-Bản kiến trúc job-queue (api + worker, dùng chung `reup-broker`) của `docker_translate` — dịch
-transcript JSON sang tiếng Việt qua Deepseek API. **`docker_translate` (bản cũ) vẫn giữ nguyên
-làm backup**, không bị đụng tới — đây là bản song song, không phải thay thế.
+Bản kiến trúc job-queue (api + worker, dùng chung `reup-broker`) — dịch transcript JSON sang
+tiếng Việt qua Deepseek API. (Bản one-shot `docker_translate` trước đây đã archive vào
+`legacy/`, không còn deploy.)
 
 Logic dịch (retry/recursive-split khi Deepseek trả sai — xem `translate_cli.py`) giữ nguyên
 100%, chỉ tách phần `main()`/argparse ra thành hàm `run_translate()` để cả CLI lẫn worker dùng

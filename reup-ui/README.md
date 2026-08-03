@@ -1,10 +1,9 @@
 # reup-ui
 
-Giao diện vận hành thay n8n UI — gọi thẳng API `reup-orchestrator-node` (không docker.sock, không
-Execute Command node). React + Vite SPA, build multi-stage (`node:20-alpine` build → `nginx:alpine`
-serve static + reverse-proxy `/api/*`).
-
-`docker_n8n` vẫn giữ nguyên làm backup, không bị đụng.
+Giao diện vận hành — gọi thẳng API `reup-orchestrator-node` (không docker.sock, không Execute
+Command node). React + Vite SPA, build multi-stage (`node:20-alpine` build → `nginx:alpine`
+serve static + reverse-proxy `/api/*`). (`docker_n8n`, giao diện vận hành trước đây, đã archive
+vào `legacy/`, không còn deploy.)
 
 ## Kiến trúc
 

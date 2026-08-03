@@ -1,8 +1,8 @@
 # reup-ytdlp-node
 
-Bản kiến trúc job-queue (api + worker, dùng chung `reup-broker`) của `docker_yt-dlp` — tải
-video (patch Douyin: `a_bogus`/cookie tự sinh). **`docker_yt-dlp` (bản cũ) vẫn giữ nguyên làm
-backup**, không bị đụng tới.
+Bản kiến trúc job-queue (api + worker, dùng chung `reup-broker`) — tải video (patch Douyin:
+`a_bogus`/cookie tự sinh). (Bản one-shot `docker_yt-dlp` trước đây đã archive vào `legacy/`,
+không còn deploy.)
 
 yt-dlp là CLI bên thứ 3 hoàn chỉnh, không có 1 hàm Python để import gọi thẳng như
 `translate`/`editor` — worker chạy `yt-dlp` qua `subprocess`, giữ nguyên đúng cách dùng

@@ -1,10 +1,10 @@
 # reup-orchestrator-node
 
-Thay vai trò sequencing của `docker_n8n` — chạy full pipeline (`ytdlp → transcribe → translate
-→ tts-gpu segments → editor srt/edit`, cả 2 nhánh **review**/**dialogue** như CLAUDE.md "Reup
-pipeline") bằng cách gọi HTTP API của 5 `reup-*-node` đã có, **không dùng Docker-out-of-Docker/
-`docker.sock`** như n8n cũ — bỏ hẳn phụ thuộc gid nhóm `docker` và `NODES_EXCLUDE`. `docker_n8n`
-vẫn giữ nguyên làm backup, không bị đụng.
+Chạy full pipeline (`ytdlp → transcribe → translate → tts-gpu segments → editor srt/edit`, cả 2
+nhánh **review**/**dialogue** như CLAUDE.md "Reup pipeline") bằng cách gọi HTTP API của 5
+`reup-*-node` đã có, **không dùng Docker-out-of-Docker/`docker.sock`** — không phụ thuộc gid
+nhóm `docker` hay `NODES_EXCLUDE` nào cả. (`docker_n8n`, cơ chế sequencing kiểu Execute-Command
+trước đây, đã archive vào `legacy/`, không còn deploy.)
 
 ## Kiến trúc
 

@@ -1,9 +1,9 @@
 # reup-transcribe-node
 
-Bản kiến trúc job-queue (api + worker, dùng chung `reup-broker`) của `docker_transcribe` —
-VAD + route Paraformer(zh)/faster-whisper(khác) + punc/align (backend `local`, GPU) hoặc
-Deepgram fallback (backend `deepgram`). **`docker_transcribe` (bản cũ) vẫn giữ nguyên làm
-backup**, không bị đụng tới.
+Bản kiến trúc job-queue (api + worker, dùng chung `reup-broker`) — VAD + route
+Paraformer(zh)/faster-whisper(khác) + punc/align (backend `local`, GPU) hoặc Deepgram fallback
+(backend `deepgram`). (Bản one-shot `docker_transcribe` trước đây đã archive vào `legacy/`,
+không còn deploy.)
 
 `pipeline.py`/`model_registry.py`/`separator.py`/`residual_qc.py`/`deepgram_backend.py` copy
 **không đổi 1 dòng logic** — `pipeline.process()` vốn đã nhận `Path` object thuần, không qua

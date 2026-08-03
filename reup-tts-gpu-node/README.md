@@ -1,9 +1,9 @@
 # reup-tts-gpu-node
 
-Bản kiến trúc job-queue (api + worker, dùng chung `reup-broker`) của `docker_vieneu-tts_gpu` —
-TTS tiếng Việt (VieNeu-TTS, GPU/PyTorch). **`docker_vieneu-tts_gpu` (bản cũ, gồm cả chế độ
-`web` Gradio) vẫn giữ nguyên làm backup**, không bị đụng tới. `docker_vieneu-tts` (CPU/ONNX)
-**không port sang kiến trúc mới** theo quyết định trong plan — chỉ còn 1 node TTS (GPU) ở đây.
+Bản kiến trúc job-queue (api + worker, dùng chung `reup-broker`) — TTS tiếng Việt (VieNeu-TTS,
+GPU/PyTorch). (Bản one-shot `docker_vieneu-tts_gpu`, gồm cả chế độ `web` Gradio, đã archive vào
+`legacy/`, không còn deploy.) `docker_vieneu-tts` (CPU/ONNX) **chưa từng có bản job-queue tương
+đương** và cũng đã archive — hiện không có lựa chọn TTS nào chạy được mà không cần GPU.
 
 ## Khác biệt quan trọng so với CLI one-shot cũ
 

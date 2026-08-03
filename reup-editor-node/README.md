@@ -1,8 +1,8 @@
 # reup-editor-node
 
-Bản kiến trúc job-queue (api + worker, dùng chung `reup-broker`) của `docker_ffmpeg-edit` — mux
-video+audio+sub, sinh `.srt`, và nhánh video thoại `mix-dialogue`. **`docker_ffmpeg-edit` (bản
-cũ) vẫn giữ nguyên làm backup**, không bị đụng tới.
+Bản kiến trúc job-queue (api + worker, dùng chung `reup-broker`) — mux video+audio+sub, sinh
+`.srt`, và nhánh video thoại `mix-dialogue`. (Bản one-shot `docker_ffmpeg-edit` trước đây đã
+archive vào `legacy/`, không còn deploy.)
 
 Cả 3 subcommand cũ (`edit`/`srt`/`mix-dialogue`) dùng chung 1 API (`POST /jobs`, phân biệt qua
 field `cmd`) — logic ffmpeg/mux/tách dòng sub/mix-crossfade giữ nguyên 100%, chỉ tách phần
