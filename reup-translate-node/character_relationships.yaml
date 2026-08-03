@@ -1,0 +1,23 @@
+# Bảng quan hệ xưng hô nhân vật cho series hay bị reup lặp lại nhiều lần (Rick and Morty...) —
+# xem build_relationship_glossary_note() / RELATIONSHIP_GLOSSARY bên translate_cli.py. Sửa/thêm
+# trực tiếp file này (mount read-only vào container, đọc lại lúc worker khởi động) — KHÔNG cần
+# sửa code hay build lại image. Cùng cơ chế/tinh thần classic_names.yaml (glossary tên riêng) —
+# khác ở chỗ đây là QUAN HỆ xưng hô, không phải cách viết tên.
+#
+# Bug thật gặp (job 114d7aa5, đoạn 6:20-7:59): không có bảng này, Deepseek tự suy luận xưng hô
+# mỗi batch riêng — chỗ đúng (Rick/Morty xưng ông/cháu) do câu nguồn tiếng Trung tự chứa từ quan
+# hệ ("外孙" = cháu ngoại), chỗ sai (thoại trực tiếp nguồn tiếng Anh "you"/"I", không tự mang
+# thông tin quan hệ) bị dịch thành tôi/cậu — ngang vai, sai hẳn vai vế gia đình.
+#
+# Format: "TênA-TênB": "mô tả xưng hô đúng". Key dùng tên tiếng Trung (khớp cách
+# build_classic_glossary_note() quét full_text TRƯỚC khi dịch) — chỉ thêm CẶP có MẶT CẢ 2 tên
+# trong video mới được đưa vào context, tránh dội bảng vào video không liên quan. Chỉ liệt kê
+# nhân vật/series hay lặp lại — không cố phủ hết mọi phim, giống tinh thần classic_names.yaml.
+
+rick_and_morty:
+  瑞克-莫蒂: "瑞克 (Rick) là ông ngoại, 莫蒂 (Morty) là cháu ngoại — xưng hô ông/con hoặc ông/cháu, KHÔNG dùng tôi/cậu hay tớ/cậu (ngang vai, sai vai vế)"
+  杰瑞-莫蒂: "杰瑞 (Jerry) là bố, 莫蒂 (Morty) là con trai — xưng hô bố/con"
+  贝斯-莫蒂: "贝斯 (Beth) là mẹ, 莫蒂 (Morty) là con trai — xưng hô mẹ/con"
+  杰瑞-贝斯: "杰瑞 (Jerry) và 贝斯 (Beth) là vợ chồng — xưng hô anh/em"
+  瑞克-杰瑞: "瑞克 (Rick) là bố vợ, 杰瑞 (Jerry) là con rể"
+  瑞克-贝斯: "瑞克 (Rick) là bố, 贝斯 (Beth) là con gái — xưng hô bố/con"

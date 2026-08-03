@@ -1,0 +1,81 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: reup-orchestrator-node/Dockerfile
+    image: reup-orchestrator-node:local
+    container_name: reup-orchestrator-node-api
+    command: ["api"]
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+      - REDIS_URL=redis://reup-redis:6379/0
+      - YTDLP_URL=http://reup-ytdlp-node-api:8000
+      - TRANSCRIBE_URL=http://reup-transcribe-node-api:8000
+      - TRANSLATE_URL=http://reup-translate-node-api:8000
+      - TTS_URL=http://reup-tts-gpu-node-api:8000
+      - EDITOR_URL=http://reup-editor-node-api:8000
+    ports:
+      - "8106:8000"
+    volumes:
+      - ./data/outputs:/outputs
+      - ../reup-editor-node/data/music:/nodes/editor/music:ro
+      - ../reup-tts-gpu-node/data/voice_samples:/nodes/tts/voice_samples:ro
+    networks:
+      - reup-net
+    # api không tự gọi node nào cho pipeline job (chỉ worker làm), chỉ ngoại lệ gọi thẳng
+    # health/list-voices các node kia (nhẹ, không cần mount data dir) cho GET /voices và
+    # GET /nodes/status (đèn xanh/đỏ worker cho dashboard monitor). Riêng GET /music và
+    # GET /voices/{id}/sample đọc thẳng filesystem (không qua job queue) nên cần mount
+    # read-only tương ứng — mount RIÊNG cho api (không phải qua worker's /nodes/...).
+    # /outputs đổi từ :ro sang rw — POST /pipelines/{id}/trim (cắt đầu/đuôi mp3 nhánh
+    # mode="audio") chạy ffmpeg TRỰC TIẾP trong api (thao tác cục bộ nhanh, không phải gọi
+    # node khác nên không cần qua job queue/worker), ghi file _trimmed.mp3 ngay vào thư mục
+    # api đã tự phục vụ static — không cấp thêm quyền nào khác ngoài đúng thư mục này.
+
+  worker:
+    build:
+      context: ..
+      dockerfile: reup-orchestrator-node/Dockerfile
+    image: reup-orchestrator-node:local
+    container_name: reup-orchestrator-node-worker
+    command: ["worker"]
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+      - REDIS_URL=redis://reup-redis:6379/0
+      - YTDLP_URL=http://reup-ytdlp-node-api:8000
+      - TRANSCRIBE_URL=http://reup-transcribe-node-api:8000
+      - TRANSLATE_URL=http://reup-translate-node-api:8000
+      - TTS_URL=http://reup-tts-gpu-node-api:8000
+      - EDITOR_URL=http://reup-editor-node-api:8000
+      - EVENT_LOG_ENABLED=true
+      # 3 -> 10: con số này TỪNG phải gánh chung 3 việc khác nhau (số video "in-flight", chặn hộ
+      # OOM GPU, né rate-limit Douyin) — bug thật gặp: 3 pipeline nặng (đang ở bước GPU) chiếm
+      # hết cả 3 slot, làm 1 job NHẸ (mode=audio, không đụng GPU) phải pending vô lý dù
+      # ytdlp-node hoàn toàn rảnh. Giờ OOM GPU đã có gpu_lock_acquire() (dùng chung giữa
+      # reup-transcribe-node/reup-tts-gpu-node) lo riêng, rate-limit Douyin đã có
+      # rate_limit_wait() (reup-ytdlp-node/scripts/queue_lib.py) lo riêng — con số NÀY giờ chỉ
+      # còn là trần an toàn thô (chống nổ thread/memory nếu có hàng chục video submit cùng lúc),
+      # không cần thắt chặt nữa. Xem đầy đủ lý do trong plan .../warm-knitting-map.md.
+      - PIPELINE_CONCURRENCY=10
+    volumes:
+      - ./data/outputs:/outputs
+      - ./data/logs:/logs
+      # Mount trực tiếp data dir của 5 node kia để tự copy file giữa các bước — không sửa
+      # docker-compose.yml của các node đó (xem "Quyết định kiến trúc #1" trong plan).
+      - ../reup-ytdlp-node/data/downloads:/nodes/ytdlp/downloads
+      - ../reup-transcribe-node/data/source:/nodes/transcribe/source
+      - ../reup-transcribe-node/data/outputs:/nodes/transcribe/outputs
+      - ../reup-translate-node/data/source:/nodes/translate/source
+      - ../reup-translate-node/data/outputs:/nodes/translate/outputs
+      - ../reup-tts-gpu-node/data/source:/nodes/tts/source
+      - ../reup-tts-gpu-node/data/outputs:/nodes/tts/outputs
+      - ../reup-editor-node/data/source:/nodes/editor/source
+      - ../reup-editor-node/data/outputs:/nodes/editor/outputs
+    networks:
+      - reup-net
+
+networks:
+  reup-net:
+    external: true

@@ -1,0 +1,17 @@
+# Cấu hình nhánh "video thoại" (mix-dialogue) — không ảnh hưởng subcommand edit/srt hiện có.
+mix_dialogue:
+  original_mix_level: 0.15   # % audio gốc trộn thêm vào instrumental trong đoạn có speech (bù độ dày/cao tần đã mất khi tách)
+  speech_only_replace: true  # true: chỉ thay bằng instrumental+original ở đoạn VAD-speech; false: thay toàn bộ track
+  crossfade_ms: 100           # độ dài crossfade (ms) ở ranh giới mỗi lần chuyển nguồn, tránh nghe rõ tiếng click
+  tts_base_gain: 1.4          # hệ số khuếch đại CỐ ĐỊNH nhân thẳng vào track TTS trước khi tính gain theo nền — xử lý case Vieneu tự sinh âm lượng thấp (áp cho MỌI segment, kể cả segment tính ra gain=1.0 theo nền)
+  tts_target_ratio: 2.5       # tỉ lệ RMS mục tiêu TTS/nền trong mỗi speech window (sau tts_base_gain) — tăng từ 2.0 vì user báo vẫn nhỏ dù đã tăng 1 lần
+  tts_gain_min: 1.0           # gain TTS tối thiểu mỗi window (không hạ nhỏ hơn mức đã qua tts_base_gain)
+  tts_gain_max: 4.0           # gain TTS tối đa mỗi window — tăng từ 3.0 vì nhiều segment thật đã chạm trần cũ (log tts_gain=3.0)
+  # Chuẩn hoá loudness TỔNG THỂ track final (EBU R128/ffmpeg loudnorm 2-pass) — khác tts_target_ratio
+  # ở trên (chỉ cân bằng TTS/nền TRONG track). Đo thật: video gốc -12.83 LUFS, output final (trước
+  # khi có bước này) -20.97 LUFS — lệch ~8 LUFS dù tts_gain đã đúng (log thật: median gain=1.0),
+  # nghĩa là root cause "âm thanh vẫn nhỏ so với video gốc" là thiếu bước này, không phải tỉ lệ TTS/nền.
+  loudnorm_enabled: true
+  loudnorm_target_i: -14.0    # LUFS mục tiêu — gần loudness thường thấy của video Douyin/TikTok đã master (đo thật -12.83)
+  loudnorm_true_peak: -1.5    # dBTP trần, chống clip khi DAC/loa đời cũ overshoot
+  loudnorm_lra: 11.0          # loudness range mục tiêu (dải động cho phép)

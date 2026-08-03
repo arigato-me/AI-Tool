@@ -1,0 +1,50 @@
+[project]
+name = "transcribe-service"
+version = "0.1.0"
+description = "Self-host STT: VAD (fsmn-vad) + lang-id + Paraformer/faster-whisper + ct-punc + WhisperX align"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "redis>=5.0",
+    "numpy",
+    "soundfile",
+    "torch==2.8.0",
+    "torchaudio==2.8.0",
+    "librosa>=0.11.0",
+    "funasr",
+    "faster-whisper",
+    "whisperx",
+    # faster-whisper -> ctranslate2 mặc định resolve về 4.4.0, bundle cuDNN 8 kiểu split-lib
+    # (libcudnn_ops_infer.so.8...) trong khi torch cài cuDNN 9 (nvidia-cudnn-cu12 merged-lib)
+    # -> lệch tên file, runtime lỗi "cannot open shared object file". ctranslate2>=4.5 hỗ trợ
+    # cuDNN 9, khớp với bản torch đã cài.
+    "ctranslate2>=4.5",
+    # Nhánh "video thoại" (mode=dialogue) — tách vocals/instrumental để giữ nền âm thanh gốc.
+    "audio-separator",
+    "pyyaml",
+]
+
+# Node này không phải 1 package Python thật (chỉ vài script chạy trực tiếp qua
+# uvicorn --app-dir) — tắt build project của uv, chỉ dùng làm resolver dependency.
+[tool.uv]
+package = false
+# funasr -> umap-learn -> pynndescent kéo theo llvmlite==0.36.0 (bản cũ, chỉ hỗ trợ
+# Python <3.10) — umap-learn chỉ phục vụ tính năng clustering/speaker diarization của
+# FunASR mà pipeline này không dùng (chỉ cần fsmn-vad/paraformer-zh/ct-punc). Ép resolver
+# dùng bản llvmlite/numba mới hỗ trợ Python 3.12, cùng kỹ thuật override-dependencies đã
+# dùng ở repo_github/VieNeu-TTS/pyproject.toml.
+override-dependencies = [
+    "llvmlite>=0.43",
+    "numba>=0.60",
+]
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch" }]
+torchaudio = [{ index = "pytorch" }]

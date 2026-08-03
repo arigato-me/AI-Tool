@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "skills": {
+    "agent-browser": {
+      "source": "vercel-labs/agent-browser",
+      "sourceType": "github",
+      "skillPath": "skills/agent-browser/SKILL.md",
+      "computedHash": "ecc7641aea05f85ca3b11e7759d32aaf52fe05946ab4b63739c7bf78a41237a2"
+    },
+    "book-study": {
+      "source": "sanyuan0704/code-review-expert",
+      "sourceType": "github",
+      "skillPath": "skills/book-study/SKILL.md",
+      "computedHash": "f02c38de9b640428987156ffd7d219e12beacf222bb633a06de48698ff466be9"
+    },
+    "brainstorming": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/brainstorming/SKILL.md",
+      "computedHash": "253570c46990ea018dd4520dba80cd77c35f9e5a8654057da1812face7be30cd"
+    },
+    "cavecrew": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/cavecrew/SKILL.md",
+      "computedHash": "c5527c994fbd4c22b36714e3b124a0f167a533d114ab164fb1d35e2123533917"
+    },
+    "caveman": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman/SKILL.md",
+      "computedHash": "d18cdf73a5f5c496d681a43a6846336b110223bdffa6817b8992529c57f1a815"
+    },
+    "caveman-commit": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman-commit/SKILL.md",
+      "computedHash": "790a4eeace0be35c6691faf923518ba5bd50f1f1305d1101d09dd4971be94e00"
+    },
+    "caveman-compress": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman-compress/SKILL.md",
+      "computedHash": "84517cd4cf7a49d8d2bc1baf00f61bc359306c6ad9389756b6937eff958bd374"
+    },
+    "caveman-help": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman-help/SKILL.md",
+      "computedHash": "dd85267e76baad76995157e7b9f762dfa557cd58951ee92af0c283f48aa26537"
+    },
+    "caveman-review": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman-review/SKILL.md",
+      "computedHash": "fb7214a1c5793bae6ba8b1be4329e2e6f40dbec6dd911dfb335ad29f09c316a1"
+    },
+    "caveman-stats": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman-stats/SKILL.md",
+      "computedHash": "47ce2de3d6cb39a75047b5c962e4eb3da15594e7397c94103e9a104d42626553"
+    },
+    "code-review-expert": {
+      "source": "sanyuan0704/code-review-expert",
+      "sourceType": "github",
+      "skillPath": "skills/code-review-expert/SKILL.md",
+      "computedHash": "6c2fe31851a34e63e033257527eab04eea835ca1cf4c4276d1392a323e36e377"
+    },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/find-skills/SKILL.md",
+      "computedHash": "781bd6d3f9b19f8c9af6b53d8d0e4876d0183841b565db34ca7092ffa412d111"
+    },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "4eabc66183767153e404b39d1b839b1c37f2d82d86f0a0d7e880a579d8d62336"
+    },
+    "git-guardrails-claude-code": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/misc/git-guardrails-claude-code/SKILL.md",
+      "computedHash": "8c29552c621da0121427306afd92f8e02f47f446cdb0b55ceae01de6879fcb3a"
+    },
+    "pdf": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/pdf/SKILL.md",
+      "computedHash": "cfbc539377088ca7e44a813b30c306327385bbd973cd7a721e1743f60837dd62"
+    },
+    "prompt-engineering-patterns": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/llm-application-dev/skills/prompt-engineering-patterns/SKILL.md",
+      "computedHash": "e6b7544a39770a3a65f6b2f5da0c455b99a2fe004fe7c6caf6f5040cda85cc54"
+    },
+    "sigma": {
+      "source": "sanyuan0704/code-review-expert",
+      "sourceType": "github",
+      "skillPath": "skills/sigma/SKILL.md",
+      "computedHash": "88bcbdec596ed7e19a50ca80282c3b12cfdcf48ae28e3ba275da3193f8a8f057"
+    },
+    "skill-creator": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-creator/SKILL.md",
+      "computedHash": "5ea13a6d9f0d4bb694405d79acd00cadec0d21bb138c4dd10fcf3c500cb835c2"
+    },
+    "skill-forge": {
+      "source": "sanyuan0704/code-review-expert",
+      "sourceType": "github",
+      "skillPath": "skills/skill-forge/SKILL.md",
+      "computedHash": "63785e2efb35dcee3588e9cd8428aab25b2a8f1e5eb67b380bdbdbeb420e5ecf"
+    },
+    "skill-review": {
+      "source": "sanyuan0704/code-review-expert",
+      "sourceType": "github",
+      "skillPath": "skills/skill-review/SKILL.md",
+      "computedHash": "8d786d13179c6bd1e0b9ff05c3db72768349ab36c43ad431638fd9eef0f21137"
+    },
+    "supabase-postgres-best-practices": {
+      "source": "supabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/supabase-postgres-best-practices/SKILL.md",
+      "computedHash": "ec56a54fba0e97bee52c7f244ba603bb284bf8d1b739c66a5cc84ec3df709d9d"
+    },
+    "wiki-ingest": {
+      "source": "sanyuan0704/code-review-expert",
+      "sourceType": "github",
+      "skillPath": "skills/wiki-ingest/SKILL.md",
+      "computedHash": "a9f2611dfbf61bb029d799ffa7d61dd6b96e693e5b086d9b19afb7d7e713faf3"
+    }
+  }
+}

@@ -1,0 +1,56 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: reup-transcribe-node/Dockerfile
+    image: reup-transcribe-node:local
+    container_name: reup-transcribe-node-api
+    command: ["api"]
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+      - REDIS_URL=redis://reup-redis:6379/0
+    ports:
+      - "8104:8000"
+    networks:
+      - reup-net
+    # api không import torch/pipeline — không cần GPU reservation, chỉ nói chuyện với Redis
+    # (đúng nguyên tắc tts-node: api restart/scale độc lập, không đụng model đang ở VRAM).
+
+  worker:
+    build:
+      context: ..
+      dockerfile: reup-transcribe-node/Dockerfile
+    image: reup-transcribe-node:local
+    container_name: reup-transcribe-node-worker
+    command: ["worker"]
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+      - REDIS_URL=redis://reup-redis:6379/0
+      - TRANSCRIBE_BACKEND=${TRANSCRIBE_BACKEND:-local}
+      - MODEL_IDLE_TIMEOUT_SECONDS=${MODEL_IDLE_TIMEOUT_SECONDS:-120}
+      - GPU_MEMORY_FRACTION=${GPU_MEMORY_FRACTION:-0.5}
+      - DEEPGRAM_API_KEY=${DEEPGRAM_API_KEY}
+      - DEEPGRAM_MODEL=${DEEPGRAM_MODEL:-nova-2}
+      - DEEPGRAM_LANGUAGE=${DEEPGRAM_LANGUAGE:-vi}
+      - EVENT_LOG_ENABLED=true
+    volumes:
+      - ./data/cache:/cache
+      - ./data/source:/source
+      - ./data/outputs:/outputs
+      - ./dialogue.yaml:/config/dialogue.yaml:ro
+      - ./data/logs:/logs
+    networks:
+      - reup-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+networks:
+  reup-net:
+    external: true

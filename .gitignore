@@ -1,0 +1,25 @@
+# Secrets — giữ .env.example, không commit .env thật
+.env
+
+# Docker image export tarballs (18G, tự tạo lại bằng images/save-images.sh)
+images/*.tar
+images/*.tar.gz
+
+# Backup archive các docker_* cũ (đã có sẵn dạng file, không cần double-track trong git)
+legacy/*.tar.gz
+
+# Bind-mount data runtime của từng node (cache/downloads/outputs/logs) — không phải source code
+*/data/
+
+# reup-ui build artifacts
+reup-ui/node_modules/
+reup-ui/dist/
+reup-ui/tsconfig.tsbuildinfo
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# File root-owned (mode 600), không đọc được để add — cần `sudo chown` tay nếu muốn track
+.specify/workflows/workflow-registry.json

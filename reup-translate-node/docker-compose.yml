@@ -1,0 +1,47 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: reup-translate-node/Dockerfile
+    image: reup-translate-node:local
+    container_name: reup-translate-node-api
+    command: ["api"]
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+      - REDIS_URL=redis://reup-redis:6379/0
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-deepseek-chat}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+    ports:
+      - "8101:8000"
+    volumes:
+      - ./data/source:/source
+      - ./data/outputs:/outputs
+    networks:
+      - reup-net
+
+  worker:
+    build:
+      context: ..
+      dockerfile: reup-translate-node/Dockerfile
+    image: reup-translate-node:local
+    container_name: reup-translate-node-worker
+    command: ["worker"]
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+      - REDIS_URL=redis://reup-redis:6379/0
+      - EVENT_LOG_ENABLED=true
+    volumes:
+      - ./data/source:/source
+      - ./data/outputs:/outputs
+      - ./data/logs:/logs
+      - ./classic_names.yaml:/config/classic_names.yaml:ro
+      - ./character_relationships.yaml:/config/character_relationships.yaml:ro
+    networks:
+      - reup-net
+
+networks:
+  reup-net:
+    external: true

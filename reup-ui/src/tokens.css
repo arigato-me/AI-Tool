@@ -1,0 +1,95 @@
+/* Hallmark · design-system: design.md · designed-as-app
+ * genre: modern-minimal · macrostructure: Workbench (adapted, app-only, no marketing sections)
+ * theme: custom-lite — system-ui font (0 webfont request, yêu cầu tường minh: web nhẹ/nhanh),
+ * accent xanh giữ nguyên từ code cũ (#2f6fed) quy sang oklch.
+ */
+:root {
+  color-scheme: light dark;
+
+  --color-paper: oklch(97% 0.004 250);
+  --color-paper-2: oklch(100% 0 0);
+  --color-ink: oklch(21% 0.02 260);
+  --color-ink-2: oklch(48% 0.02 260);
+  --color-rule: oklch(90% 0.008 250);
+  --color-accent: oklch(58% 0.19 258);
+  --color-accent-ink: oklch(99% 0 0);
+  --color-focus: oklch(58% 0.19 258);
+
+  --color-success-bg: oklch(93% 0.06 150);
+  --color-success-fg: oklch(38% 0.11 150);
+  --color-danger-bg: oklch(92% 0.05 20);
+  --color-danger-fg: oklch(42% 0.16 25);
+  --color-danger-border: oklch(58% 0.2 25);
+  --color-warning-bg: oklch(93% 0.07 85);
+  --color-warning-fg: oklch(45% 0.1 70);
+  --color-neutral-bg: oklch(91% 0.006 260);
+  --color-neutral-fg: oklch(42% 0.015 260);
+  --color-info-bg: oklch(90% 0.06 258);
+  --color-info-fg: oklch(38% 0.14 258);
+
+  --font-display: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-md: 0.95rem;
+  --text-lg: 1.1rem;
+  --text-xl: 1.375rem;
+  --text-2xl: clamp(1.75rem, 1.4rem + 1.2vw, 2.6rem);
+
+  --space-3xs: 0.25rem;
+  --space-2xs: 0.4rem;
+  --space-xs: 0.6rem;
+  --space-sm: 0.85rem;
+  --space-md: 1.25rem;
+  --space-lg: 1.75rem;
+  --space-xl: 2.5rem;
+  --space-2xl: 3.5rem;
+
+  --radius-card: 12px;
+  --radius-input: 8px;
+  --radius-pill: 999px;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+
+  --touch-target: 2.75rem;
+
+  --shadow-card: 0 1px 2px oklch(0% 0 0 / 0.04), 0 8px 24px oklch(0% 0 0 / 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: oklch(19% 0.012 255);
+    --color-paper-2: oklch(24% 0.014 255);
+    --color-ink: oklch(93% 0.006 250);
+    --color-ink-2: oklch(68% 0.016 250);
+    --color-rule: oklch(33% 0.016 255);
+    --color-accent: oklch(72% 0.15 258);
+    --color-accent-ink: oklch(14% 0.02 258);
+    --color-focus: oklch(72% 0.15 258);
+
+    --color-success-bg: oklch(30% 0.07 150);
+    --color-success-fg: oklch(85% 0.1 150);
+    --color-danger-bg: oklch(28% 0.07 25);
+    --color-danger-fg: oklch(85% 0.1 20);
+    --color-danger-border: oklch(62% 0.19 25);
+    --color-warning-bg: oklch(30% 0.06 75);
+    --color-warning-fg: oklch(85% 0.09 80);
+    --color-neutral-bg: oklch(30% 0.012 260);
+    --color-neutral-fg: oklch(82% 0.012 260);
+    --color-info-bg: oklch(28% 0.08 258);
+    --color-info-fg: oklch(84% 0.09 258);
+
+    --shadow-card: 0 1px 2px oklch(0% 0 0 / 0.3), 0 8px 24px oklch(0% 0 0 / 0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+  }
+}

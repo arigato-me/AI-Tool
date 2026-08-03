@@ -1,0 +1,14 @@
+**/.git
+**/.venv
+**/__pycache__
+**/*.pyc
+repo_github/yt-dlp/dist
+repo_github/yt-dlp/build
+repo_github/yt-dlp/zip
+repo_github/yt-dlp/yt-dlp
+repo_github/yt-dlp/yt-dlp.zip
+images
+legacy
+repo_github/VieNeu-TTS/.venv
+repo_github/VieNeu-TTS/output_audio
+repo_github/VieNeu-TTS/.git

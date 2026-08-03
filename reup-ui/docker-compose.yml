@@ -1,0 +1,16 @@
+services:
+  ui:
+    build:
+      context: ..
+      dockerfile: reup-ui/Dockerfile
+    image: reup-ui:local
+    container_name: reup-ui
+    restart: unless-stopped
+    ports:
+      - "8107:80"
+    networks:
+      - reup-net
+
+networks:
+  reup-net:
+    external: true

@@ -1,0 +1,9 @@
+# Cấu hình nhánh "video thoại" (mode=dialogue) — giữ nền âm thanh gốc, chỉ mute tiếng Trung.
+# Không ảnh hưởng nhánh "review" (mặc định) — file này chỉ được đọc khi request có mode=dialogue.
+separate:
+  enabled: true                      # tắt = mode=dialogue trả lỗi rõ ràng thay vì âm thầm bỏ qua tách nền
+  model_primary: "UVR-MDX-NET-Inst_HQ_3.onnx"   # MDX-Net Inst HQ 3 — model tách chính
+  model_fallback: "htdemucs_ft"                  # Demucs — dùng ensemble đối chiếu residual, không phải fallback-khi-lỗi
+  segment_size: 256                  # giây/chunk khi tách — nhỏ để vừa VRAM 4GB dùng chung với docker_vieneu-tts_gpu
+  residual_check: true               # bật kiểm tra dư âm giọng nói qua VAD (xem docker_transcribe/scripts/residual_qc.py)
+  residual_threshold: 0.5            # điểm 0-1, vượt ngưỡng này thì segment bị đánh dấu residual_risk cao trong transcript JSON

@@ -1,0 +1,20 @@
+[project]
+name = "ffmpeg-edit-service"
+version = "0.1.0"
+description = "Mux/burn video + audio + subtitle; nhánh video thoại (mix-dialogue) trộn nền gốc + TTS"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "soundfile",
+    "pyyaml",
+    "scipy",
+    "pillow",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "redis>=5.0",
+]
+
+# Node này không phải 1 package Python thật (chỉ vài script chạy trực tiếp) — tắt build
+# project của uv, chỉ dùng làm resolver dependency.
+[tool.uv]
+package = false

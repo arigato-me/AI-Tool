@@ -1,0 +1,17 @@
+# Rate-limit theo domain nguồn — xem rate_limit_wait() trong scripts/queue_lib.py và plan
+# lưu ở .../warm-knitting-map.md ("3 cơ chế tách biệt") để hiểu tại sao file này tồn tại tách
+# riêng khỏi PIPELINE_CONCURRENCY của orchestrator (2 việc khác bản chất: concurrency lo "bao
+# nhiêu video đang chạy", file này lo "bao nhiêu request/1 khoảng thời gian cho 1 domain").
+#
+# Mount read-only vào container (xem docker-compose.yml), sửa/thêm domain KHÔNG cần build lại
+# image — chỉ cần restart worker để đọc lại (đọc mỗi lần gọi rate_limit_wait(), không cache).
+#
+# Domain KHÔNG có trong file này = KHÔNG giới hạn gì (an toàn mặc định).
+# Format: "<domain>": {max_requests: <số request>, window_s: <khoảng thời gian, giây>}
+#
+# douyin.com: 5 request/10 phút — giá trị khởi điểm thận trọng, CHƯA đo ngưỡng thật của Douyin
+# (đo thật tốn nhiều request thật, dễ ăn block oan) — nới dần nếu thấy quá chặt so với nhu cầu
+# thực tế, hoặc thắt lại nếu vẫn còn gặp 403/504 dù đã có retry ở ytdlp_runner.py.
+douyin.com:
+  max_requests: 5
+  window_s: 600

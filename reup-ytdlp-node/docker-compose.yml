@@ -1,0 +1,43 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: reup-ytdlp-node/Dockerfile
+    image: reup-ytdlp-node:local
+    container_name: reup-ytdlp-node-api
+    command: ["api"]
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+      - REDIS_URL=redis://reup-redis:6379/0
+    ports:
+      - "8102:8000"
+    volumes:
+      - ./data/downloads:/downloads
+      - ./data/config:/config
+    networks:
+      - reup-net
+
+  worker:
+    build:
+      context: ..
+      dockerfile: reup-ytdlp-node/Dockerfile
+    image: reup-ytdlp-node:local
+    container_name: reup-ytdlp-node-worker
+    command: ["worker"]
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+      - REDIS_URL=redis://reup-redis:6379/0
+      - EVENT_LOG_ENABLED=true
+    volumes:
+      - ./data/downloads:/downloads
+      - ./data/config:/config
+      - ./data/logs:/logs
+      - ./rate_limits.yaml:/config/rate_limits.yaml:ro
+    networks:
+      - reup-net
+
+networks:
+  reup-net:
+    external: true

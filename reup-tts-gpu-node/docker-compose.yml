@@ -1,0 +1,52 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: reup-tts-gpu-node/Dockerfile
+    image: reup-tts-gpu-node:local
+    container_name: reup-tts-gpu-node-api
+    command: ["api"]
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+      - REDIS_URL=redis://reup-redis:6379/0
+    ports:
+      - "8105:8000"
+    networks:
+      - reup-net
+    # api không import vieneu/torch — không cần GPU reservation, chỉ nói chuyện với Redis.
+
+  worker:
+    build:
+      context: ..
+      dockerfile: reup-tts-gpu-node/Dockerfile
+    image: reup-tts-gpu-node:local
+    container_name: reup-tts-gpu-node-worker
+    command: ["worker"]
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+      - REDIS_URL=redis://reup-redis:6379/0
+      - GPU_MEMORY_FRACTION=${GPU_MEMORY_FRACTION:-0.5}
+      - VIENEU_VOICE=${VIENEU_VOICE:-Phạm Tuyên}
+      - VIENEU_STYLE=${VIENEU_STYLE:-tu_nhien}
+      - EVENT_LOG_ENABLED=true
+    volumes:
+      - ./data/cache:/cache/huggingface
+      - ./data/source:/source
+      - ./data/outputs:/outputs
+      - ./data/logs:/logs
+      - ./data/voice_samples:/voice_samples
+    networks:
+      - reup-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+networks:
+  reup-net:
+    external: true

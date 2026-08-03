@@ -1,0 +1,1052 @@
+/* Hallmark · design-system: design.md · designed-as-app */
+@import "./tokens.css";
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  overflow-x: clip;
+}
+
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.app {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 clamp(1rem, 4vw, 2rem) var(--space-2xl);
+}
+
+/* ---------- Nav ---------- */
+
+.nav {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-md) 0;
+  border-bottom: 1px solid var(--color-rule);
+  margin-bottom: var(--space-lg);
+}
+
+.nav-brand {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin: 0;
+}
+
+.nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target);
+  height: var(--touch-target);
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-input);
+  color: var(--color-ink);
+}
+
+.nav-toggle svg {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.nav-links a {
+  color: var(--color-ink-2);
+  text-decoration: none;
+  font-size: var(--text-md);
+  white-space: nowrap;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+.nav-links a.active,
+.nav-links a:hover {
+  color: var(--color-accent);
+}
+
+@media (max-width: 40rem) {
+  .nav-toggle {
+    display: inline-flex;
+  }
+
+  .nav-links {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3xs);
+    margin-top: var(--space-2xs);
+    padding: var(--space-xs);
+    background: var(--color-paper-2);
+    border: 1px solid var(--color-rule);
+    border-radius: var(--radius-card);
+    box-shadow: 0 12px 28px oklch(0% 0 0 / 0.16);
+    z-index: 20;
+  }
+
+  .nav-links[data-open="true"] {
+    display: flex;
+  }
+
+  .nav-links a {
+    padding: var(--space-sm);
+    border-radius: var(--radius-input);
+    min-height: var(--touch-target);
+    display: flex;
+    align-items: center;
+  }
+
+  .nav-links a.active,
+  .nav-links a:hover {
+    background: var(--color-info-bg);
+  }
+}
+
+/* ---------- Card / form primitives ---------- */
+
+.card {
+  background: var(--color-paper-2);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-md);
+  box-shadow: var(--shadow-card);
+}
+
+.card h2 {
+  margin-top: 0;
+  font-size: var(--text-lg);
+}
+
+label {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+  margin-bottom: var(--space-md);
+}
+
+input,
+select {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-3xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-input);
+  border: 1px solid var(--color-rule);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: var(--text-md);
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+input:hover,
+select:hover {
+  border-color: var(--color-ink-2);
+}
+
+/* type="checkbox"/"color"/"range" đều bị rule `input { display:block; width:100% }` ở trên kéo
+   dài full-width + đóng khung như text input — checkbox thành ô vuông méo, color input thành
+   1 thanh dài có viền (trông y hệt range slider). Trả lại kích thước/hình dạng tự nhiên. */
+input[type="checkbox"] {
+  display: inline-block;
+  width: auto;
+  margin-top: var(--space-2xs);
+  accent-color: var(--color-accent);
+}
+
+input[type="color"] {
+  display: inline-block;
+  width: 3rem;
+  height: 2.25rem;
+  margin-top: var(--space-3xs);
+  padding: 2px;
+  cursor: pointer;
+}
+
+input[type="range"] {
+  padding: 0;
+  border: none;
+  background: transparent;
+  accent-color: var(--color-accent);
+}
+
+.radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+  margin-top: var(--space-2xs);
+}
+
+.radio-group label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  margin-bottom: 0;
+  padding: var(--space-2xs) var(--space-sm);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-pill);
+  color: var(--color-ink-2);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.radio-group label:hover {
+  border-color: var(--color-ink-2);
+}
+
+.radio-group label:has(input:checked) {
+  background: var(--color-info-bg);
+  border-color: var(--color-accent);
+  color: var(--color-info-fg);
+  font-weight: 500;
+}
+
+.radio-group input {
+  width: auto;
+  accent-color: var(--color-accent);
+}
+
+/* ---------- Dropdown (thay <select> gốc — option list gốc do OS vẽ, không theo được token
+   màu app, gây bug nền trắng/chữ xám khi lệch theme; tự vẽ popup để kiểm soát 100% màu) ---------- */
+
+.dropdown {
+  position: relative;
+  margin-top: var(--space-3xs);
+}
+
+.dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2xs);
+  width: 100%;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-input);
+  border: 1px solid var(--color-rule);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: var(--text-md);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  opacity: 1;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+.dropdown-trigger:hover {
+  opacity: 1;
+  border-color: var(--color-ink-2);
+}
+
+.dropdown-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdown-caret {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  color: var(--color-ink-2);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.dropdown-trigger[aria-expanded="true"] .dropdown-caret {
+  transform: rotate(180deg);
+}
+
+.dropdown-list {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + var(--space-3xs));
+  left: 0;
+  right: 0;
+  max-height: 16rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--space-3xs);
+  list-style: none;
+  background: var(--color-paper-2);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-input);
+  box-shadow: var(--shadow-card);
+}
+
+/* Field gần đáy màn hình (vd Nhạc nền, field cuối form) không đủ chỗ mở xuống — Dropdown.tsx
+   tự đo lúc mở và gắn class này để lật popup lên trên trigger thay vì tràn ra ngoài viewport. */
+.dropdown-list--up {
+  top: auto;
+  bottom: calc(100% + var(--space-3xs));
+}
+
+.dropdown-option {
+  padding: var(--space-2xs) var(--space-sm);
+  border-radius: var(--radius-input);
+  font-size: var(--text-md);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.dropdown-option.is-highlighted {
+  background: var(--color-info-bg);
+  color: var(--color-info-fg);
+}
+
+.dropdown-option.is-selected {
+  font-weight: 600;
+}
+
+.filter-label .dropdown {
+  width: auto;
+  min-width: 9rem;
+  margin-top: 0;
+}
+
+/* ---------- Audio preview (voice/nhạc nền nghe thử) — khung riêng, full-width, không còn
+   chen trong grid hẹp nên <audio> gốc (có min-width nội tại trình duyệt) không tràn/đè nữa ---------- */
+
+.audio-preview {
+  margin-top: var(--space-xs);
+}
+
+.audio-preview .stage-detail {
+  display: block;
+  margin-bottom: var(--space-3xs);
+}
+
+.audio-preview audio {
+  width: 100%;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-sm);
+}
+
+/* Panel chỉnh style phụ đề (burn) — khung nhẹ tách khỏi form chính, ảnh demo full-width phía
+   trên, field bên dưới dùng .sub-style-fields (2 cột cố định: chữ | control). */
+.sub-style-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--color-paper-2);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+}
+
+/* Danh sách field kiểu "chữ nhãn | control" — cột 1 rộng vừa đủ chữ dài nhất, cột 2 chứa
+   control, mọi hàng dùng CHUNG 1 lưới nên control (checkbox/color/range) luôn thẳng cột với
+   nhau, không lệch theo từng label riêng như .row (grid tự động chia theo item, không phải
+   theo field) từng gây ra. `label { display: contents }` bỏ box của label khỏi layout — chữ
+   (span) và control bên trong nó trở thành 2 item trực tiếp của grid, rơi đúng 2 cột đã định. */
+.sub-style-fields {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: var(--space-md);
+  row-gap: var(--space-xs);
+  align-items: center;
+}
+
+.sub-style-fields label {
+  display: contents;
+}
+
+.sub-style-fields label span {
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+  white-space: nowrap;
+}
+
+.sub-style-fields input[type="range"] {
+  width: 100%;
+  max-width: 16rem;
+}
+
+/* checkbox/color không có kích thước cố định theo chiều ngang như range (width:100%) — mặc định
+   grid item "stretch" sẽ kéo giãn cả VÙNG grid area của nó ra hết cột 1fr, khiến ô tick/màu bé
+   xíu trôi nổi lệch khỏi mép trái cột (có browser căn giữa vùng đã giãn) thay vì đứng thẳng mép
+   với color/range ở hàng khác. Ép đứng yên mép trái, không giãn theo cột. */
+.sub-style-fields input[type="checkbox"],
+.sub-style-fields input[type="color"] {
+  justify-self: start;
+}
+
+.sub-style-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.sub-style-actions button {
+  width: auto;
+}
+
+.sub-style-preview img {
+  /* Ảnh demo giờ crop sát khối chữ (kích thước tự nhiên nhỏ gọn) — hiện đúng cỡ thật, chỉ co
+     lại khi rộng hơn khung chứa (mobile), không ép giãn/thu nhỏ như trước (từng làm chữ tí hon). */
+  display: block;
+  max-width: 100%;
+  margin: 0 auto;
+  border-radius: var(--radius-input);
+  border: 1px solid var(--color-rule);
+}
+
+/* Bố cục 2 cột dạng list/detail (MusicLibrary) — cột trái cố định min/max, cột phải co giãn;
+   xuống 1 cột dưới breakpoint tablet để không bị bóp chật trên điện thoại. */
+.split-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+  gap: var(--space-md);
+  align-items: start;
+}
+
+/* Chia đôi đều 50/50 (khác .split-panel gốc: cột trái cố định hẹp cho layout list/detail) —
+   dùng cho 2 nhóm stat-card ngang hàng nhau, vd Monitor "Video đã xử lý xong" | "Token dịch". */
+.split-panel--even {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.split-panel--even h2 {
+  font-size: var(--text-md);
+}
+
+@media (max-width: 40rem) {
+  .split-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+.list-plain {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-md);
+}
+
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  margin-bottom: var(--space-2xs);
+}
+
+.list-item-btn {
+  flex: 1;
+  text-align: left;
+  min-height: var(--touch-target);
+}
+
+.track-row {
+  margin-bottom: var(--space-md);
+}
+
+.track-row-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-3xs);
+}
+
+.track-row-head > span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+button {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  border: none;
+  border-radius: var(--radius-input);
+  padding: var(--space-xs) var(--space-lg);
+  font-size: var(--text-md);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+}
+
+button:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--color-ink);
+  border: 1px solid var(--color-rule);
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-accent);
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.btn-link:disabled {
+  color: var(--color-ink-2);
+  cursor: default;
+}
+
+.error {
+  color: var(--color-danger-fg);
+  font-size: var(--text-sm);
+}
+
+.error-block {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-danger-fg);
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-input);
+  padding: var(--space-sm);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.context-box {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--color-info-bg);
+  color: var(--color-info-fg);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-input);
+  padding: var(--space-sm);
+  margin: var(--space-3xs) 0 0;
+}
+
+/* ---------- Table (card layout on mobile) ---------- */
+
+.table-wrap {
+  overflow-x: auto;
+  min-height: 33rem;
+}
+
+.table-wrap--compact {
+  min-height: 0;
+}
+
+table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: var(--text-sm);
+}
+
+th,
+td {
+  text-align: left;
+  padding: var(--space-2xs) var(--space-3xs);
+  border-bottom: 1px solid var(--color-rule);
+}
+
+tbody tr {
+  height: 2.75rem;
+}
+
+.cell-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+th {
+  color: var(--color-ink-2);
+  font-weight: 500;
+}
+
+a {
+  color: var(--color-accent);
+}
+
+@media (max-width: 40rem) {
+  .table-wrap {
+    overflow-x: visible;
+    min-height: 0;
+  }
+
+  table {
+    min-width: 0;
+  }
+
+  thead {
+    display: none;
+  }
+
+  table,
+  tbody,
+  tr,
+  td {
+    display: block;
+    width: 100%;
+  }
+
+  tbody tr {
+    height: auto;
+    border: 1px solid var(--color-rule);
+    border-radius: var(--radius-card);
+    padding: var(--space-xs) var(--space-sm);
+    margin-bottom: var(--space-sm);
+  }
+
+  /* td là block, không phải flex — ::before (label) tự xuống dòng nhờ display:block, phần nội
+     dung thật của ô (có thể gồm nhiều phần tử inline như "nút · link") giữ nguyên flow inline
+     bình thường trên (các) dòng kế tiếp thay vì mỗi con bị tách thành 1 dòng riêng. */
+  td {
+    display: block;
+    padding: var(--space-2xs) 0;
+    border-bottom: 1px solid var(--color-rule);
+    text-align: left;
+  }
+
+  tr td:last-child {
+    border-bottom: none;
+  }
+
+  /* .cell-truncate là cắt chữ cho bảng desktop (giữ cột thẳng hàng) — trên thẻ mobile không có
+     cột nào để giữ thẳng hàng nữa, phải hiện đủ chữ (vd tên video dài). */
+  td,
+  td.cell-truncate {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
+
+  td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    color: var(--color-ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    margin-bottom: var(--space-3xs);
+  }
+
+  td[colspan] {
+    text-align: center;
+  }
+
+  td[colspan]::before {
+    content: none;
+  }
+}
+
+/* ---------- Status / pills ---------- */
+
+.status {
+  padding: var(--space-3xs) var(--space-sm);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+}
+
+.status-finished {
+  background: var(--color-success-bg);
+  color: var(--color-success-fg);
+}
+
+.status-failed {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-fg);
+  border: 1.5px solid var(--color-danger-border);
+  font-weight: 700;
+}
+
+.status-started,
+.status-pending {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-fg);
+}
+
+.status-cancelled {
+  background: var(--color-neutral-bg);
+  color: var(--color-neutral-fg);
+}
+
+.stage-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+
+.stage-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2xs) var(--space-sm);
+  padding: var(--space-2xs) var(--space-sm);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-input);
+}
+
+.stage-name {
+  font-weight: 500;
+}
+
+.stage-detail {
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+
+video {
+  width: 100%;
+  border-radius: var(--radius-input);
+  margin-top: var(--space-sm);
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: var(--space-md);
+  font-size: var(--text-sm);
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.stat-card {
+  margin-bottom: 0;
+  padding: var(--space-md) var(--space-lg);
+}
+
+.stat-card--inline {
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+}
+
+.stat-label {
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+  margin-bottom: var(--space-2xs);
+  letter-spacing: 0.01em;
+}
+
+.stat-value {
+  font-size: clamp(1.8rem, 1.5rem + 1vw, 2.6rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+}
+
+.stage-pill {
+  display: inline-block;
+  padding: var(--space-3xs) var(--space-xs);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  background: var(--color-info-bg);
+  color: var(--color-info-fg);
+  white-space: nowrap;
+}
+
+.stage-pill--error {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-fg);
+}
+
+.worker-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+}
+
+@media (max-width: 45rem) {
+  .worker-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.worker-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+}
+
+.worker-name {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin-bottom: var(--space-3xs);
+}
+
+.worker-info .stage-detail {
+  font-size: var(--text-md);
+}
+
+.dot {
+  flex: none;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+}
+
+.dot-green {
+  background: oklch(72% 0.19 150);
+  box-shadow: 0 0 0 3px oklch(72% 0.19 150 / 0.2);
+}
+
+.dot-red {
+  background: oklch(62% 0.22 25);
+  box-shadow: 0 0 0 3px oklch(62% 0.22 25 / 0.2);
+}
+
+.row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.row-header h2 {
+  margin: 0;
+}
+
+.filter-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  margin-bottom: 0;
+  font-size: var(--text-sm);
+}
+
+.filter-label select {
+  width: auto;
+  margin-top: 0;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.pagination button {
+  padding: var(--space-2xs) var(--space-md);
+  font-size: var(--text-sm);
+}
+
+.btn-icon-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-input);
+  color: var(--color-ink-2);
+  transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.btn-icon-danger svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.btn-icon-danger:hover:not(:disabled) {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
+  color: var(--color-danger-fg);
+}
+
+.btn-icon-danger:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn-icon-star {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  flex: none;
+  padding: var(--space-3xs) var(--space-2xs);
+  background: transparent;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-input);
+  color: var(--color-ink-2);
+  font-size: 0.85rem;
+  transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.btn-icon-star:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.btn-icon-star.is-default {
+  background: var(--color-info-bg);
+  border-color: var(--color-accent);
+  color: var(--color-info-fg);
+}
+
+.btn-icon-star:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---------- Field info tooltip (nút "i" thay cho description luôn hiện) ---------- */
+
+.field-label-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3xs);
+}
+
+.field-info {
+  position: relative;
+  display: inline-flex;
+}
+
+.field-info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  background: var(--color-info-bg);
+  color: var(--color-info-fg);
+  border: none;
+  border-radius: 50%;
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-style: italic;
+  line-height: 1;
+  cursor: help;
+}
+
+.field-info-btn:hover {
+  opacity: 1;
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+
+.field-info-popup {
+  position: absolute;
+  z-index: 15;
+  bottom: calc(100% + var(--space-2xs));
+  left: 0;
+  width: max-content;
+  max-width: 18rem;
+  padding: var(--space-2xs) var(--space-sm);
+  background: var(--color-paper-2);
+  color: var(--color-ink);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-input);
+  box-shadow: var(--shadow-card);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  line-height: 1.4;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+  pointer-events: none;
+}
+
+.field-info:hover .field-info-popup,
+.field-info:focus-within .field-info-popup {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .field-info-popup {
+    transition: none;
+  }
+}
+
+/* ---------- Touch targets (coarse pointer = phone/tablet) ---------- */
+
+@media (pointer: coarse) {
+  button,
+  input,
+  select,
+  .btn-link,
+  .dropdown-trigger {
+    min-height: var(--touch-target);
+  }
+
+  .btn-link {
+    min-height: auto;
+    padding: var(--space-2xs) 0;
+  }
+
+  .btn-icon-danger {
+    width: var(--touch-target);
+    height: var(--touch-target);
+  }
+
+  .pagination button {
+    min-height: var(--touch-target);
+  }
+
+  .dropdown-option {
+    min-height: var(--touch-target);
+    display: flex;
+    align-items: center;
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//u01/reup_tool/docker_build/docker_ffmpeg-edit/**)",
+      "Bash(docker compose *)",
+      "Read(//run/**)",
+      "Bash(getent group *)",
+      "Bash(docker run *)"
+    ]
+  }
+}

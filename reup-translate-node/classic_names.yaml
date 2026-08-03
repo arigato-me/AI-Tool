@@ -1,0 +1,584 @@
+# Bảng tên riêng + biệt danh cho tác phẩm kinh điển Trung Quốc hay bị reup (Thủy Hử, Tam Quốc
+# Diễn Nghĩa, Tây Du Ký, Kim Dung...) — xem build_classic_glossary_note() / CLASSIC_NAME_GLOSSARY
+# bên translate_cli.py. Sửa/thêm trực tiếp file này (mount read-only vào container, đọc lại MỖI
+# LẦN chạy job dịch) — KHÔNG cần sửa code hay build lại image.
+#
+# Format mỗi dòng: "tên gốc tiếng Trung": "tên/biệt danh tiếng Việt chuẩn". Bị dịch/echo sai 1
+# tên riêng nào thì thêm dòng tương ứng ở đây là đủ, không cần đụng translate_cli.py.
+#
+# Không liệt kê hết MỌI nhân vật/biệt danh của Tam Quốc (hàng trăm nhân vật lịch sử) hay MỌI
+# tiểu thuyết Kim Dung (15 bộ) — chỉ nhân vật/biệt danh chính, nổi bật nhất, tránh rủi ro tự bịa
+# tên nhân vật phụ ít người biết. Thiếu tên nào thì extract_name_glossary() (per-video, gọi
+# Deepseek) vẫn tự bắt qua như cũ.
+
+thuy_hu:
+  # Tên (108 anh hùng Lương Sơn Bạc + vài nhân vật quan trọng khác)
+  宋江: Tống Giang
+  卢俊义: Lư Tuấn Nghĩa
+  吴用: Ngô Dụng
+  公孙胜: Công Tôn Thắng
+  关胜: Quan Thắng
+  林冲: Lâm Xung
+  秦明: Tần Minh
+  呼延灼: Hô Duyên Chước
+  花荣: Hoa Vinh
+  柴进: Sài Tiến
+  李应: Lý Ứng
+  朱仝: Chu Đồng
+  鲁智深: Lỗ Trí Thâm
+  武松: Võ Tòng
+  董平: Đổng Bình
+  张清: Trương Thanh (phi tiêu)
+  杨志: Dương Chí
+  徐宁: Từ Ninh
+  索超: Sách Siêu
+  戴宗: Đới Tung
+  刘唐: Lưu Đường
+  李逵: Lý Quỳ
+  史进: Sử Tiến
+  穆弘: Mục Hoằng
+  雷横: Lôi Hoành
+  阮小二: Nguyễn Tiểu Nhị
+  阮小五: Nguyễn Tiểu Ngũ
+  阮小七: Nguyễn Tiểu Thất
+  杨雄: Dương Hùng
+  石秀: Thạch Tú
+  解珍: Giải Trân
+  解宝: Giải Bảo
+  燕青: Yến Thanh
+  朱武: Chu Vũ
+  黄信: Hoàng Tín
+  孙立: Tôn Lập
+  宣赞: Tuyên Tán
+  郝思文: Hác Tư Văn
+  韩滔: Hàn Thao
+  彭玘: Bành Kỷ
+  单廷珪: Đan Đình Khuê
+  魏定国: Ngụy Định Quốc
+  萧让: Tiêu Nhượng
+  裴宣: Bùi Tuyên
+  欧鹏: Âu Bằng
+  邓飞: Đặng Phi
+  燕顺: Yến Thuận
+  杨林: Dương Lâm
+  凌振: Lăng Chấn
+  蒋敬: Tưởng Kính
+  吕方: Lã Phương
+  郭盛: Quách Thịnh
+  安道全: An Đạo Toàn
+  皇甫端: Hoàng Phủ Đoan
+  王英: Vương Anh
+  扈三娘: Hỗ Tam Nương
+  鲍旭: Bào Húc
+  樊瑞: Phàn Thụy
+  孔明: Khổng Minh (Thủy Hử)
+  孔亮: Khổng Lượng
+  项充: Hạng Sung
+  李衮: Lý Cổn
+  金大坚: Kim Đại Kiên
+  马麟: Mã Lân
+  童威: Đồng Uy
+  童猛: Đồng Mãnh
+  孟康: Mạnh Khang
+  侯健: Hầu Kiện
+  陈达: Trần Đạt (Thủy Hử)
+  杨春: Dương Xuân
+  郑天寿: Trịnh Thiên Thọ
+  陶宗旺: Đào Tông Vượng
+  宋清: Tống Thanh
+  乐和: Nhạc Hòa
+  龚旺: Củng Vượng
+  丁得孙: Đinh Đắc Tôn
+  穆春: Mục Xuân
+  曹正: Tào Chính
+  宋万: Tống Vạn
+  杜迁: Đỗ Thiên
+  薛永: Tiết Vĩnh
+  施恩: Thi Ân
+  李忠: Lý Trung
+  周通: Chu Thông
+  汤隆: Thang Long
+  杜兴: Đỗ Hưng
+  邹渊: Trâu Uyên
+  邹润: Trâu Nhuận
+  朱贵: Chu Quý
+  朱富: Chu Phú
+  蔡福: Sái Phúc
+  蔡庆: Sái Khánh
+  李立: Lý Lập
+  李云: Lý Vân
+  焦挺: Tiêu Đĩnh
+  石勇: Thạch Dũng
+  孙新: Tôn Tân
+  顾大嫂: Cố Đại Tẩu
+  张青: Trương Thanh (Thái Viên Tử)
+  孙二娘: Tôn Nhị Nương
+  王定六: Vương Định Lục
+  郁保四: Uất Bảo Tứ
+  白胜: Bạch Thắng
+  时迁: Thời Thiên
+  段景住: Đoàn Cảnh Trụ
+  高俅: Cao Cầu
+  童贯: Đồng Quán
+  蔡京: Sái Kinh
+  阎婆惜: Diêm Bà Tích
+  潘金莲: Phan Kim Liên
+  西门庆: Tây Môn Khánh
+  潘巧云: Phan Xảo Vân
+
+  # Biệt danh (chỉ nhân vật/biệt danh nổi tiếng, chắc chắn đúng convention Việt hoá — bug thật
+  # gặp: "及时雨" (biệt danh Tống Giang) bị dịch nghĩa đen thành "Cơn mưa kịp thời" thay vì giữ
+  # biệt danh "Cập Thời Vũ", vì trước đây KHÔNG có trong bảng, Deepseek tự dịch nghĩa từng chữ)
+  及时雨: Cập Thời Vũ
+  玉麒麟: Ngọc Kỳ Lân
+  智多星: Trí Đa Tinh
+  入云龙: Nhập Vân Long
+  豹子头: Báo Tử Đầu
+  霹雳火: Tích Lịch Hỏa
+  双鞭: Song Tiên
+  小李广: Tiểu Lý Quảng
+  小旋风: Tiểu Toàn Phong
+  扑天雕: Phác Thiên Điêu
+  美髯公: Mỹ Nhiêm Công
+  花和尚: Hoa Hòa Thượng
+  行者: Hành Giả
+  双枪将: Song Thương Tướng
+  没羽箭: Một Vũ Tiễn
+  青面兽: Thanh Diện Thú
+  金枪手: Kim Thương Thủ
+  急先锋: Cấp Tiên Phong
+  神行太保: Thần Hành Thái Bảo
+  赤发鬼: Xích Phát Quỷ
+  黑旋风: Hắc Toàn Phong
+  九纹龙: Cửu Văn Long
+  插翅虎: Sáp Sí Hổ
+  立地太岁: Lập Địa Thái Tuế
+  短命二郎: Đoản Mệnh Nhị Lang
+  活阎罗: Hoạt Diêm La
+  病关索: Bệnh Quan Sách
+  拼命三郎: Liều Mạng Tam Lang
+  浪子: Lãng Tử (Yến Thanh)
+
+  # Biệt danh mở rộng (76 vị còn lại trong 108 anh hùng) — lấy từ Deepseek (deepseek-chat), đối chiếu chéo với ~10 biệt danh đã biết chắc ở trên (khớp 100%), đã sửa 2 lỗi phát hiện được (mixing từ thuần Việt, sai dấu Hán Việt). Độ tin cậy thấp hơn phần trên (nhân vật phụ, ít tài liệu đối chiếu) — sai chỗ nào thì sửa thẳng dòng tương ứng, không cần đụng code.
+  大刀: Đại Đao
+  没遮拦: Một Già Lan
+  两头蛇: Lưỡng Đầu Xà
+  双尾蝎: Song Vĩ Yết
+  神机军师: Thần Cơ Quân Sư
+  镇三山: Trấn Tam Sơn
+  病尉迟: Bệnh Úy Trì
+  丑郡马: Xú Quận Mã
+  井木犴: Tỉnh Mộc Ngan
+  百胜将: Bách Thắng Tướng
+  天目将: Thiên Mục Tướng
+  圣水将: Thánh Thủy Tướng
+  神火将: Thần Hỏa Tướng
+  圣手书生: Thánh Thủ Thư Sinh
+  铁面孔目: Thiết Diện Khổng Mục
+  摩云金翅: Ma Vân Kim Sí
+  火眼狻猊: Hỏa Nhãn Toán Nghê
+  锦毛虎: Cẩm Mao Hổ
+  锦豹子: Cẩm Báo Tử
+  轰天雷: Oanh Thiên Lôi
+  神算子: Thần Toán Tử
+  小温侯: Tiểu Ôn Hầu
+  赛仁贵: Tái Nhân Quý
+  神医: Thần Y
+  紫髯伯: Tử Nhiêm Bá
+  矮脚虎: Ải Cước Hổ
+  一丈青: Nhất Trượng Thanh
+  丧门神: Tang Môn Thần
+  混世魔王: Hỗn Thế Ma Vương
+  毛头星: Mao Đầu Tinh
+  独火星: Độc Hỏa Tinh
+  八臂哪吒: Bát Tý Na Tra
+  飞天大圣: Phi Thiên Đại Thánh
+  玉臂匠: Ngọc Tý Tượng
+  铁笛仙: Thiết Địch Tiên
+  出洞蛟: Xuất Động Giao
+  翻江蜃: Phiên Giang Thận
+  玉幡竿: Ngọc Phiên Can
+  通臂猿: Thông Tý Viên
+  跳涧虎: Khiêu Giản Hổ
+  白花蛇: Bạch Hoa Xà
+  白面郎君: Bạch Diện Lang Quân
+  九尾龟: Cửu Vĩ Quy
+  铁扇子: Thiết Phiến Tử
+  铁叫子: Thiết Khiếu Tử
+  花项虎: Hoa Hạng Hổ
+  中箭虎: Trúng Tiễn Hổ
+  小遮拦: Tiểu Già Lan
+  操刀鬼: Thao Đao Quỷ
+  云里金刚: Vân Lý Kim Cương
+  摸着天: Mạc Trứ Thiên
+  病大虫: Bệnh Đại Trùng
+  金眼彪: Kim Nhãn Bưu
+  打虎将: Đả Hổ Tướng
+  小霸王: Tiểu Bá Vương
+  金钱豹子: Kim Tiền Báo Tử
+  鬼脸儿: Quỷ Kiểm Nhi
+  出林龙: Xuất Lâm Long
+  独角龙: Độc Giác Long
+  旱地忽律: Hạn Địa Hốt Luật
+  笑面虎: Tiếu Diện Hổ
+  铁臂膊: Thiết Tý Bác
+  一枝花: Nhất Chi Hoa
+  催命判官: Thôi Mệnh Phán Quan
+  青眼虎: Thanh Nhãn Hổ
+  没面目: Một Diện Mục
+  石将军: Thạch Tướng Quân
+  小尉迟: Tiểu Úy Trì
+  母大虫: Mẫu Đại Trùng
+  菜园子: Thái Viên Tử
+  母夜叉: Mẫu Dạ Xoa
+  活闪婆: Hoạt Thiểm Bà
+  险道神: Hiểm Đạo Thần
+  白日鼠: Bạch Nhật Thử
+  鼓上蚤: Cổ Thượng Tảo
+  金毛犬: Kim Mao Khuyển
+
+tam_quoc:
+  刘备: Lưu Bị
+  关羽: Quan Vũ
+  张飞: Trương Phi
+  诸葛亮: Gia Cát Lượng
+  赵云: Triệu Vân
+  曹操: Tào Tháo
+  孙权: Tôn Quyền
+  孙策: Tôn Sách
+  孙坚: Tôn Kiên
+  周瑜: Chu Du
+  鲁肃: Lỗ Túc
+  黄盖: Hoàng Cái
+  甘宁: Cam Ninh
+  太史慈: Thái Sử Từ
+  陆逊: Lục Tốn
+  吕蒙: Lã Mông
+  司马懿: Tư Mã Ý
+  司马昭: Tư Mã Chiêu
+  司马师: Tư Mã Sư
+  夏侯惇: Hạ Hầu Đôn
+  夏侯渊: Hạ Hầu Uyên
+  张辽: Trương Liêu
+  许褚: Hứa Chử
+  典韦: Điển Vi
+  徐晃: Từ Hoảng
+  张郃: Trương Cáp
+  郭嘉: Quách Gia
+  荀彧: Tuân Úc
+  荀攸: Tuân Du
+  程昱: Trình Dục
+  吕布: Lã Bố
+  貂蝉: Điêu Thuyền
+  董卓: Đổng Trác
+  王允: Vương Doãn
+  袁绍: Viên Thiệu
+  袁术: Viên Thuật
+  公孙瓒: Công Tôn Toản
+  马超: Mã Siêu
+  黄忠: Hoàng Trung
+  魏延: Ngụy Diên
+  姜维: Khương Duy
+  庞统: Bàng Thống
+  法正: Pháp Chính
+  刘禅: Lưu Thiện
+  关平: Quan Bình
+  关兴: Quan Hưng
+  张苞: Trương Bào
+  糜竺: Mi Trúc
+  糜芳: Mi Phương
+  简雍: Giản Ung
+  孙尚香: Tôn Thượng Hương
+  陶谦: Đào Khiêm
+  刘表: Lưu Biểu
+  刘璋: Lưu Chương
+  张鲁: Trương Lỗ
+  孟获: Mạnh Hoạch
+  祝融夫人: Chúc Dung phu nhân
+  华佗: Hoa Đà
+  左慈: Tả Từ
+  祢衡: Nễ Hành
+  杨修: Dương Tu
+  曹丕: Tào Phi
+  曹植: Tào Thực
+  曹仁: Tào Nhân
+  曹洪: Tào Hồng
+  曹真: Tào Chân
+  高览: Cao Lãm
+  文丑: Văn Xú
+  颜良: Nhan Lương
+  田丰: Điền Phong
+  陈宫: Trần Cung
+  李儒: Lý Nho
+  李傕: Lý Thôi
+  郭汜: Quách Dĩ
+  张角: Trương Giác
+  张宝: Trương Bảo
+  张梁: Trương Lương (em Trương Giác)
+  何进: Hà Tiến
+  丁原: Đinh Nguyên
+  王朗: Vương Lãng
+  邓艾: Đặng Ngải
+  钟会: Chung Hội
+  诸葛瞻: Gia Cát Chiêm
+  诸葛恪: Gia Cát Khác
+  陆抗: Lục Kháng
+  孙皓: Tôn Hạo
+
+tay_du_ky:
+  孙悟空: Tôn Ngộ Không
+  猪八戒: Trư Bát Giới
+  沙僧: Sa Tăng
+  沙悟净: Sa Ngộ Tịnh
+  唐僧: Đường Tăng
+  玄奘: Huyền Trang
+  白龙马: Bạch Long Mã
+  如来佛祖: Như Lai Phật Tổ
+  观音菩萨: Quan Âm Bồ Tát
+  玉皇大帝: Ngọc Hoàng Đại Đế
+  太上老君: Thái Thượng Lão Quân
+  王母娘娘: Vương Mẫu Nương Nương
+  菩提祖师: Bồ Đề Tổ Sư
+  牛魔王: Ngưu Ma Vương
+  铁扇公主: Thiết Phiến Công Chúa
+  红孩儿: Hồng Hài Nhi
+  白骨精: Bạch Cốt Tinh
+  二郎神: Nhị Lang Thần
+  哪吒: Na Tra
+  托塔天王: Thác Tháp Thiên Vương
+  龙王: Long Vương
+  阎王: Diêm Vương
+  金角大王: Kim Giác Đại Vương
+  银角大王: Ngân Giác Đại Vương
+  六耳猕猴: Lục Nhĩ Mỹ Hầu
+  镇元子: Trấn Nguyên Tử
+  黑熊怪: Hắc Hùng Quái
+
+kim_dung:
+  郭靖: Quách Tĩnh
+  黄蓉: Hoàng Dung
+  杨康: Dương Khang
+  穆念慈: Mục Niệm Từ
+  洪七公: Hồng Thất Công
+  黄药师: Hoàng Dược Sư
+  欧阳锋: Âu Dương Phong
+  周伯通: Chu Bá Thông
+  一灯大师: Nhất Đăng Đại Sư
+  王重阳: Vương Trùng Dương
+  丘处机: Khưu Xử Cơ
+  成吉思汗: Thành Cát Tư Hãn
+  杨过: Dương Quá
+  小龙女: Tiểu Long Nữ
+  郭襄: Quách Tương
+  李莫愁: Lý Mạc Sầu
+  公孙止: Công Tôn Chỉ
+  金轮法王: Kim Luân Pháp Vương
+  郭芙: Quách Phù
+  张无忌: Trương Vô Kỵ
+  赵敏: Triệu Mẫn
+  周芷若: Chu Chỉ Nhược
+  小昭: Tiểu Chiêu
+  殷离: Ân Ly
+  张翠山: Trương Thúy Sơn
+  殷素素: Ân Tố Tố
+  谢逊: Tạ Tốn
+  张三丰: Trương Tam Phong
+  灭绝师太: Diệt Tuyệt Sư Thái
+  乔峰: Kiều Phong
+  萧峰: Tiêu Phong
+  段誉: Đoàn Dự
+  虚竹: Hư Trúc
+  王语嫣: Vương Ngữ Yên
+  阿朱: A Châu
+  阿紫: A Tử
+  慕容复: Mộ Dung Phục
+  鸠摩智: Cưu Ma Trí
+  天山童姥: Thiên Sơn Đồng Lão
+  令狐冲: Lệnh Hồ Xung
+  任盈盈: Nhậm Doanh Doanh
+  岳不群: Nhạc Bất Quần
+  东方不败: Đông Phương Bất Bại
+  风清扬: Phong Thanh Dương
+  林平之: Lâm Bình Chi
+  韦小宝: Vi Tiểu Bảo
+  康熙: Khang Hi
+  袁承志: Viên Thừa Chí
+  石破天: Thạch Phá Thiên
+
+  # Lộc Đỉnh Ký — nhân vật (Vi Tiểu Bảo trước đó chỉ có tên + Khang Hi, thiếu cả dàn nhân vật
+  # chính: 7 bà vợ, Thiên Địa Hội, Thần Long Giáo, phe Ngô Tam Quế)
+  陈近南: Trần Cận Nam
+  天地会: Thiên Địa Hội
+  吴三桂: Ngô Tam Quế
+  陈圆圆: Trần Viên Viên
+  索额图: Tác Ngạch Đồ
+  多隆: Đa Long
+  建宁公主: Kiến Ninh Công Chúa
+  阿珂: A Kha
+  苏荃: Tô Thuyên
+  曾柔: Tăng Nhu
+  方怡: Phương Di
+  沐剑屏: Mộc Kiếm Bình
+  双儿: Song Nhi
+  洪安通: Hồng An Thông
+  神龙教: Thần Long Giáo
+  归辛树: Quy Tân Thụ
+  九难: Cửu Nạn
+  独臂神尼: Độc Tý Thần Ni
+  郑克塽: Trịnh Khắc Sảng
+  冯锡范: Phùng Tích Phạm
+  海大富: Hải Đại Phú
+
+  # Lộc Đỉnh Ký — biệt danh (2 tên giả Vi Tiểu Bảo hay dùng xuyên suốt truyện)
+  小玄子: Tiểu Huyền Tử
+  小桂子: Tiểu Quế Tử
+
+  # Anh Hùng Xạ Điêu / Thần Điêu Hiệp Lữ — Ngũ Tuyệt + biệt danh nổi tiếng nhất Kim Dung
+  东邪: Đông Tà
+  西毒: Tây Độc
+  南帝: Nam Đế
+  北丐: Bắc Cái
+  中神通: Trung Thần Thông
+  老顽童: Lão Ngoan Đồng
+  西狂: Tây Cuồng
+  北侠: Bắc Hiệp
+  南僧: Nam Tăng
+
+  # Thiên Long Bát Bộ — biệt danh
+  扫地僧: Tảo Địa Tăng
+
+  # Tiếu Ngạo Giang Hồ — nhân vật + biệt danh
+  任我行: Nhậm Ngã Hành
+  左冷禅: Tả Lãnh Thiền
+  仪琳: Nghi Lâm
+  不戒和尚: Bất Giới Hòa Thượng
+  桃谷六仙: Đào Cốc Lục Tiên
+  岳灵珊: Nhạc Linh San
+  宁中则: Ninh Trung Tắc
+  向问天: Hướng Vấn Thiên
+  蓝凤凰: Lam Phượng Hoàng
+  华山派: Hoa Sơn Phái
+  日月神教: Nhật Nguyệt Thần Giáo
+
+  # Lộc Đỉnh Ký — bổ sung thêm nhân vật phụ nổi bật
+  顺治: Thuận Trị
+  韦春花: Vi Xuân Hoa
+  茅十八: Mao Thập Bát
+  施琅: Thi Lang
+  郑经: Trịnh Kinh
+  沐王府: Mộc Vương Phủ
+  葛尔丹: Cát Nhĩ Đan
+
+  # Anh Hùng Xạ Điêu — bổ sung Giang Nam Thất Quái, phe Kim quốc/Mông Cổ, phản diện
+  江南七怪: Giang Nam Thất Quái
+  柯镇恶: Kha Trấn Ác
+  朱聪: Chu Thông
+  韩宝驹: Hàn Bảo Câu
+  南希仁: Nam Hi Nhân
+  张阿生: Trương A Sinh
+  全金发: Toàn Kim Phát
+  韩小莹: Hàn Tiểu Oánh
+  梅超风: Mai Siêu Phong
+  陈玄风: Trần Huyền Phong
+  欧阳克: Âu Dương Khắc
+  完颜洪烈: Hoàn Nhan Hồng Liệt
+  铁木真: Thiết Mộc Chân
+  拖雷: Đà Lôi
+  华筝: Hoa Tranh
+  裘千仞: Cừu Thiên Nhận
+  裘千丈: Cừu Thiên Trượng
+  灵智上人: Linh Trí Thượng Nhân
+  沙通天: Sa Thông Thiên
+  彭连虎: Bành Liên Hổ
+  侯通海: Hầu Thông Hải
+  梁子翁: Lương Tử Ông
+  马钰: Mã Ngọc
+  全真七子: Toàn Chân Thất Tử
+
+  # Thần Điêu Hiệp Lữ — bổ sung
+  郭破虏: Quách Phá Lỗ
+  完颜萍: Hoàn Nhan Bình
+  耶律齐: Da Luật Tề
+  耶律燕: Da Luật Yến
+  陆无双: Lục Vô Song
+  程英: Trình Anh
+  武修文: Vũ Tu Văn
+  武敦儒: Vũ Đôn Nho
+  尹志平: Doãn Chí Bình
+  甄志丙: Chân Chí Bính
+  霍都: Hoắc Đô
+  孙婆婆: Tôn Bà Bà
+  裘千尺: Cừu Thiên Xích
+  绝情谷: Tuyệt Tình Cốc
+
+  # Ỷ Thiên Đồ Long Ký — bổ sung Minh Giáo/Võ Đang
+  明教: Minh Giáo
+  杨逍: Dương Tiêu
+  范遥: Phạm Dao
+  韦一笑: Vi Nhất Tiếu
+  说不得: Thuyết Bất Đắc
+  殷天正: Ân Thiên Chính
+  金毛狮王: Kim Mao Sư Vương
+  紫衫龙王: Tử Sam Long Vương
+  白眉鹰王: Bạch My Ưng Vương
+  青翼蝠王: Thanh Dực Bức Vương
+  四大法王: Tứ Đại Pháp Vương
+  武当七侠: Võ Đang Thất Hiệp
+  宋远桥: Tống Viễn Kiều
+  俞莲舟: Du Liên Châu
+  俞岱岩: Du Đại Nham
+  张松溪: Trương Tùng Khê
+  莫声谷: Mạc Thanh Cốc
+
+  # Thiên Long Bát Bộ — bổ sung
+  段正淳: Đoàn Chính Thuần
+  段延庆: Đoàn Diên Khánh
+  丁春秋: Đinh Xuân Thu
+  游坦之: Du Thản Chi
+  康敏: Khang Mẫn
+  包不同: Bao Bất Đồng
+  风波恶: Phong Ba Ác
+  古笃诚: Cổ Đốc Thành
+  邓百川: Đặng Bách Xuyên
+  公冶乾: Công Dã Càn
+  四大恶人: Tứ Đại Ác Nhân
+  南海鳄神: Nam Hải Ngạc Thần
+  云中鹤: Vân Trung Hạc
+  叶二娘: Diệp Nhị Nương
+  阿碧: A Bích
+  木婉清: Mộc Uyển Thanh
+  钟灵: Chung Linh
+
+  # Thư Kiếm Ân Cừu Lục
+  陈家洛: Trần Gia Lạc
+  霍青桐: Hoắc Thanh Đồng
+  香香公主: Hương Hương Công Chúa
+  乾隆: Càn Long
+  红花会: Hồng Hoa Hội
+
+  # Bích Huyết Kiếm — 袁承志 đã có ở trên
+  夏雪宜: Hạ Tuyết Nghi
+  温青青: Ôn Thanh Thanh
+  阿九: A Cửu
+  长平公主: Trường Bình Công Chúa
+  崇祯: Sùng Trinh
+  李自成: Lý Tự Thành
+
+  # Liên Thành Quyết
+  狄云: Địch Vân
+  戚芳: Thích Phương
+  丁典: Đinh Điển
+  凌霜华: Lăng Sương Hoa
+  花铁干: Hoa Thiết Cán
+  血刀老祖: Huyết Đao Lão Tổ
+
+  # Hiệp Khách Hành — 石破天 đã có ở trên
+  石中玉: Thạch Trung Ngọc
+  谢烟客: Tạ Yên Khách
+  白自在: Bạch Tự Tại
+  长乐帮: Trường Lạc Bang
+
+  # Việt Nữ Kiếm (truyện ngắn)
+  阿青: A Thanh
+  范蠡: Phạm Lãi
+  西施: Tây Thi

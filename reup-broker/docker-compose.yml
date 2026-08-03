@@ -1,0 +1,14 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: reup-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    volumes:
+      - ./data:/data
+    networks:
+      - reup-net
+
+networks:
+  reup-net:
+    name: reup-net
