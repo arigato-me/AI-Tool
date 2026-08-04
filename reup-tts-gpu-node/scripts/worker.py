@@ -44,7 +44,15 @@ def _heartbeat_loop(conn: redis_lib.Redis, interval: float = 10.0) -> None:
     hạn giữa chừng dù worker vẫn đang bận, khiến `/health`/`/nodes/status` tưởng nhầm là down.
     Bug thật gặp: dashboard monitor báo đúng node đang xử lý job là down."""
     while True:
-        q.heartbeat(conn, ROLE)
+        try:
+            q.heartbeat(conn, ROLE)
+        except Exception as e:
+            # Bug thật gặp: 1 lỗi Redis (network blip/idle-timeout, không cần Redis chết hẳn)
+            # ném exception ra khỏi vòng lặp làm CHẾT LUÔN thread này — không ai khởi động lại,
+            # nên node báo down vĩnh viễn dù main loop vẫn xử lý job bình thường, tới khi có
+            # người restart tay. Nuốt lỗi + lặp tiếp: redis-py tự mở lại kết nối ở lần gọi kế,
+            # không cần tự viết logic reconnect.
+            print(f"[heartbeat] lỗi ghi (bỏ qua, thử lại sau {interval}s): {e}", file=sys.stderr)
         time.sleep(interval)
 
 

@@ -6,6 +6,11 @@ khởi động lại. Mỗi node (`reup-*-node`) có 1 bản copy độc lập c
 
 `SERVICE` (đặt ở đầu mỗi bản copy) làm prefix key — nhiều node dùng chung 1 Redis
 (`reup-broker`) mà không đụng key của nhau.
+
+Bản copy này (ocr-node) thêm khoá GPU dùng chung với reup-transcribe-node/reup-tts-gpu-node
+(xem gpu_lock_acquire/renew/release bên dưới, copy nguyên từ reup-transcribe-node/scripts/
+queue_lib.py) — Tier 2 (OCR ảnh/trang scan) cần giữ khoá này khi chạy PaddleOCR/VietOCR trên
+GPU dùng chung với 2 node kia.
 """
 from __future__ import annotations
 
@@ -20,7 +25,7 @@ from typing import Any
 
 import redis
 
-SERVICE = "transcribe"  # đổi giá trị này ở mỗi node khi copy sang
+SERVICE = "ocr"  # đổi giá trị này ở mỗi node khi copy sang
 
 JOB_TTL_S = 48 * 3600
 HEARTBEAT_TTL_S = 30
@@ -135,9 +140,9 @@ def queue_depth(conn: redis.Redis) -> dict[str, int]:
 
 def log_event(payload: dict[str, Any]) -> None:
     """Ghi 1 dòng JSONL vào `/logs/YYYY-MM-DD.jsonl` — structured, mang `pipeline_id`/
-    `video_name` để tra chéo giữa các node khi debug lỗi chất lượng (dịch sai, mute, noise,
-    echo...). Không bao giờ được phép làm crash job thật đang chạy — mọi lỗi (disk đầy, quyền
-    ghi...) bị nuốt tại đây, chỉ in cảnh báo ra stderr."""
+    `video_name` để tra chéo giữa các node khi debug lỗi chất lượng. Không bao giờ được phép
+    làm crash job thật đang chạy — mọi lỗi (disk đầy, quyền ghi...) bị nuốt tại đây, chỉ in
+    cảnh báo ra stderr."""
     if not EVENT_LOG_ENABLED:
         return
     try:
@@ -148,6 +153,27 @@ def log_event(payload: dict[str, Any]) -> None:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except Exception as e:
         print(f"[log_event] lỗi ghi log (bỏ qua, không ảnh hưởng job): {e}", file=sys.stderr)
+
+
+def prune_old_logs() -> int:
+    """Xoá file `/logs/*.jsonl` cũ hơn `LOG_RETENTION_DAYS` — gọi định kỳ từ
+    `_log_retention_loop()` trong worker.py. Tự nuốt lỗi, không bao giờ crash worker."""
+    n = 0
+    try:
+        if not LOG_DIR.is_dir():
+            return 0
+        cutoff = date.today() - timedelta(days=LOG_RETENTION_DAYS)
+        for f in LOG_DIR.glob("*.jsonl"):
+            try:
+                file_date = date.fromisoformat(f.stem)
+            except ValueError:
+                continue
+            if file_date < cutoff:
+                f.unlink()
+                n += 1
+    except Exception as e:
+        print(f"[prune_old_logs] lỗi dọn log (bỏ qua): {e}", file=sys.stderr)
+    return n
 
 
 GPU_LOCK_KEY = "gpu:lock:holder"
@@ -167,8 +193,6 @@ if lowest[1] == ARGV[1] and redis.call("EXISTS", KEYS[1]) == 0 then
 end
 return 0
 """
-# So token trước khi renew/release — tránh gia hạn/xoá nhầm khoá node khác đã giành sau khi
-# lease của mình lỡ hết hạn (an toàn kiểu Redlock).
 _RENEW_SCRIPT = """
 if redis.call("GET", KEYS[1]) == ARGV[1] then
     return redis.call("EXPIRE", KEYS[1], ARGV[2])
@@ -185,11 +209,12 @@ return 0
 
 def gpu_lock_acquire(conn: redis.Redis, node: str, priority: float, lease_s: float = 30.0,
                       timeout_s: float = 1800.0) -> str:
-    """Giành khoá GPU dùng chung giữa reup-transcribe-node/reup-tts-gpu-node. `priority` thấp
-    hơn = ưu tiên cao hơn (tts-gpu=0, transcribe=1) — khi khoá rảnh, chỉ waiter có priority thấp
-    nhất mới được thử giành, KHÔNG preempt job đang giữ khoá. Raise TimeoutError/lỗi kết nối
-    thay vì âm thầm bỏ qua — job gọi hàm này phải để lỗi lan ra ngoài và fail rõ ràng, không bao
-    giờ chạy GPU mà thiếu khoá xác nhận."""
+    """Giành khoá GPU dùng chung giữa reup-transcribe-node/reup-tts-gpu-node/ocr-node.
+    `priority` thấp hơn = ưu tiên cao hơn (tts-gpu=0, transcribe=1, ocr=2 — việc nền, không cần
+    latency thấp) — khi khoá rảnh, chỉ waiter có priority thấp nhất mới được thử giành, KHÔNG
+    preempt job đang giữ khoá. Raise TimeoutError/lỗi kết nối thay vì âm thầm bỏ qua — job gọi
+    hàm này phải để lỗi lan ra ngoài và fail rõ ràng, không bao giờ chạy GPU mà thiếu khoá xác
+    nhận."""
     token = f"{node}:{uuid.uuid4().hex}"
     score = priority + time.time() * 1e-12  # phần thập phân nhỏ giữ FIFO trong cùng mức ưu tiên
     conn.zadd(GPU_WAITERS_KEY, {token: score})
@@ -213,24 +238,3 @@ def gpu_lock_renew(conn: redis.Redis, token: str, lease_s: float = 30.0) -> bool
 def gpu_lock_release(conn: redis.Redis, token: str) -> None:
     conn.eval(_RELEASE_SCRIPT, 1, GPU_LOCK_KEY, token)
     conn.zrem(GPU_WAITERS_KEY, token)  # dọn nếu lỡ bỏ cuộc giữa chừng trước khi giành được
-
-
-def prune_old_logs() -> int:
-    """Xoá file `/logs/*.jsonl` cũ hơn `LOG_RETENTION_DAYS` — gọi định kỳ từ
-    `_log_retention_loop()` trong worker.py. Tự nuốt lỗi, không bao giờ crash worker."""
-    n = 0
-    try:
-        if not LOG_DIR.is_dir():
-            return 0
-        cutoff = date.today() - timedelta(days=LOG_RETENTION_DAYS)
-        for f in LOG_DIR.glob("*.jsonl"):
-            try:
-                file_date = date.fromisoformat(f.stem)
-            except ValueError:
-                continue
-            if file_date < cutoff:
-                f.unlink()
-                n += 1
-    except Exception as e:
-        print(f"[prune_old_logs] lỗi dọn log (bỏ qua): {e}", file=sys.stderr)
-    return n

@@ -75,10 +75,17 @@ def pop_job(conn: redis.Redis, timeout: int = 5) -> str | None:
     Bug thật gặp khi test: redis-py ném `redis.exceptions.TimeoutError` (thay vì trả None)
     khi socket-level timeout xảy ra sát ngưỡng blocking timeout của BLMOVE — tuỳ version/độ
     trễ mạng, không phải lỗi thật (không có job) — coi như 1 vòng poll rỗng thay vì crash
-    worker (trước đó làm worker crash-loop liên tục, không giữ model resident được)."""
+    worker (trước đó làm worker crash-loop liên tục, không giữ model resident được).
+
+    Bug thật gặp lần 2 (test cắt mạng thật, không chỉ timeout sát ngưỡng): mất kết nối Redis
+    hẳn (network blip, DNS resolution fail...) ném `redis.exceptions.ConnectionError` — KHÔNG
+    phải subclass của `TimeoutError`, lọt qua except cũ, crash cả worker. Bắt rộng ra
+    `redis.exceptions.RedisError` (class cha chung của mọi lỗi redis-py, gồm cả 2 loại trên) —
+    cùng coi như 1 vòng poll rỗng, để lần gọi kế tự thử kết nối lại, không cần tự viết logic
+    reconnect."""
     try:
         job_id = conn.blmove(_pending_key(), _processing_key(), timeout, "LEFT", "RIGHT")
-    except redis.exceptions.TimeoutError:
+    except redis.exceptions.RedisError:
         return None
     return job_id.decode() if job_id else None
 
