@@ -1,5 +1,6 @@
 # Secrets — giữ .env.example, không commit .env thật
 .env
+youtube_cookies.txt
 
 # Docker image export tarballs (18G, tự tạo lại bằng images/save-images.sh)
 images/*.tar

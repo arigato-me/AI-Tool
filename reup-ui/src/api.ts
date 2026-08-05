@@ -23,6 +23,15 @@ export interface PipelineResult {
   // review/dialogue/subtitle (mode="audio"/"video" dừng sau ytdlp, bỏ qua bước translate, không
   // có field này).
   video_context?: string;
+  // mode="book" — file text đầy đủ (narrator để trần, thoại nhân vật có nhãn "[Tên]") luôn có
+  // khi job xong. `text` (nội dung đầy đủ) chỉ có khi NGẮN (~<2 trang giấy, xem
+  // BOOK_TEXT_PREVIEW_MAX_CHARS bên pipeline_runner.py) — sách dài chỉ tải qua text_output.
+  text_output?: string;
+  text?: string;
+  // mode="book" — ảnh/file gốc đã import lúc submit, đã copy sang /outputs/<id>/ của chính
+  // pipeline này để reup-ui hiển thị lại (khác /source của ocr-node, không phục vụ HTTP ra
+  // ngoài). Đúng thứ tự đã gộp vào transcript (1 ảnh = 1 trang).
+  source_files?: string[];
 }
 
 export interface PipelineJob {
@@ -100,10 +109,16 @@ export async function clearDefaultSubStyle(): Promise<{ ok: boolean; error?: str
   return res.json();
 }
 
+export interface BookDocument {
+  data_b64: string;
+  ext: string;
+}
+
 export interface SubmitPipelineBody {
-  url: string;
+  // Bắt buộc cho mọi mode TRỪ "book" (nhánh sách dùng documents thay vì url).
+  url?: string;
   video_name?: string;
-  mode: "review" | "dialogue" | "subtitle" | "audio" | "video";
+  mode: "review" | "dialogue" | "subtitle" | "audio" | "video" | "book";
   source_lang?: "zh" | "other";
   voice?: string;
   style?: string;
@@ -119,6 +134,14 @@ export interface SubmitPipelineBody {
   // Chọn theo thư viện project/theme (mới) — ưu tiên hơn music_preset, thua music_b64.
   music_project?: string;
   music_track?: string;
+  // mode="book" — 1 HOẶC NHIỀU file pdf/docx/pptx/xlsx/ảnh upload tay (base64) thay cho url —
+  // nhiều file dùng cho sách chụp nhiều ảnh (1 ảnh/trang), gộp theo đúng thứ tự mảng, xem
+  // reup-orchestrator-node/scripts/pipeline_runner.py::_run_book_pipeline.
+  documents?: BookDocument[];
+  ocr_lang?: "vi" | "en" | "fr";
+  // Ngôn ngữ đọc (dịch sang) — mặc định "tiếng Việt" ở orchestrator nếu không gửi. mode="book"
+  // mới cho chọn tay (Tiếng Việt/Tiếng Anh); nhánh video không gửi field này, giữ nguyên default.
+  target_lang?: string;
 }
 
 export async function submitPipeline(

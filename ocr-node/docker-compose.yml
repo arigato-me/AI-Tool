@@ -1,0 +1,56 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: ocr-node/Dockerfile
+    image: ocr-node:local
+    container_name: ocr-node-api
+    command: ["api"]
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+      - REDIS_URL=redis://reup-redis:6379/0
+    ports:
+      - "8108:8000"
+    volumes:
+      - ./data/source:/source
+      - ./data/outputs:/outputs
+    networks:
+      - reup-net
+    # api không import torch/paddleocr/vietocr — không cần GPU reservation, chỉ nói chuyện với
+    # Redis (đúng nguyên tắc mọi node khác: api restart/scale độc lập, không đụng model đang ở VRAM).
+
+  worker:
+    build:
+      context: ..
+      dockerfile: ocr-node/Dockerfile
+    image: ocr-node:local
+    container_name: ocr-node-worker
+    command: ["worker"]
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+      - REDIS_URL=redis://reup-redis:6379/0
+      - EVENT_LOG_ENABLED=true
+      - GPU_MEMORY_FRACTION=${GPU_MEMORY_FRACTION:-0.3}
+      - OCR_LANG=${OCR_LANG:-vi}
+      - VIETOCR_MODEL_NAME=${VIETOCR_MODEL_NAME:-vgg_transformer}
+      - VIETOCR_DEVICE=${VIETOCR_DEVICE:-cuda:0}
+    volumes:
+      - ./data/source:/source
+      - ./data/outputs:/outputs
+      - ./data/cache:/cache
+      - ./data/logs:/logs
+    networks:
+      - reup-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+networks:
+  reup-net:
+    external: true

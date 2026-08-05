@@ -28,6 +28,10 @@ class TranslateJobRequest(BaseModel):
     batch_size: int = 20
     pipeline_id: str | None = None  # correlation ID cho log — orchestrator truyền vào, không bắt buộc
     video_name: str | None = None
+    # Gán vai (narrator/tên nhân vật) mỗi segment — CHỈ orchestrator bật cho nhánh sách
+    # (mode="book", xem translate_cli.py::tag_speakers). Mặc định tắt, không đổi hành vi nhánh
+    # video review/dialogue/subtitle.
+    tag_speakers: bool = False
 
 
 @app.get("/health")

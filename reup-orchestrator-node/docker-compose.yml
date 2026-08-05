@@ -15,6 +15,7 @@ services:
       - TRANSLATE_URL=http://reup-translate-node-api:8000
       - TTS_URL=http://reup-tts-gpu-node-api:8000
       - EDITOR_URL=http://reup-editor-node-api:8000
+      - OCR_URL=http://ocr-node-api:8000
     ports:
       - "8106:8000"
     volumes:
@@ -49,6 +50,7 @@ services:
       - TRANSLATE_URL=http://reup-translate-node-api:8000
       - TTS_URL=http://reup-tts-gpu-node-api:8000
       - EDITOR_URL=http://reup-editor-node-api:8000
+      - OCR_URL=http://ocr-node-api:8000
       - EVENT_LOG_ENABLED=true
       # 3 -> 10: con số này TỪNG phải gánh chung 3 việc khác nhau (số video "in-flight", chặn hộ
       # OOM GPU, né rate-limit Douyin) — bug thật gặp: 3 pipeline nặng (đang ở bước GPU) chiếm
@@ -73,6 +75,8 @@ services:
       - ../reup-tts-gpu-node/data/outputs:/nodes/tts/outputs
       - ../reup-editor-node/data/source:/nodes/editor/source
       - ../reup-editor-node/data/outputs:/nodes/editor/outputs
+      - ../ocr-node/data/source:/nodes/ocr/source
+      - ../ocr-node/data/outputs:/nodes/ocr/outputs
     networks:
       - reup-net
 

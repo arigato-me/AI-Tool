@@ -1,0 +1,65 @@
+[project]
+name = "ocr-node"
+version = "0.1.0"
+description = "OCR/document-extract node: MarkItDown (docx/pptx/xlsx) + PyMuPDF (pdf, text layer + render trang scan) + PaddleOCR/VietOCR (ảnh/trang scan) -> transcript JSON cho nhánh sách->audio"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "redis>=5.0",
+    "pymupdf>=1.24",
+    # KHÔNG cài extra "all" và KHÔNG cài markitdown-ocr (dùng LLM Vision cloud) — trái nguyên
+    # tắc OCR 100% local. Chỉ đủ extra cho docx/pptx/xlsx (pdf tự xử bằng pymupdf ở trên).
+    "markitdown[docx,pptx,xlsx]>=0.0.1a3",
+    # >=3.0 là rewrite lớn, đổi hẳn sang kiến trúc "pipeline" mới — bỏ hẳn các kwarg API cũ
+    # (use_gpu, show_log, lang=...) mà ocr_engine.py (port từ ocr-service tham khảo) đang dùng.
+    # Ghim <3.0 để giữ API cũ — bug thật gặp lúc build: "ValueError: Unknown argument: use_gpu".
+    "paddleocr>=2.9,<3.0",
+    # `paddleocr` chỉ là wrapper — KHÔNG tự kéo theo `paddlepaddle` (framework thật chạy model).
+    # Bug thật gặp lúc chạy worker: "ModuleNotFoundError: No module named 'paddle'". Cài riêng
+    # bản GPU khớp CUDA qua index chính thức PaddlePaddle (không có wheel cu128 sẵn — cu129 gần
+    # nhất, driver host đã chạy được cu128 (torch) nên chắc chắn chạy được cu129).
+    "paddlepaddle-gpu==3.2.2",
+    # vietocr's PyPI metadata omits torch/torchvision even though it hard-requires them at
+    # import time (đã xác nhận ở ocr-service tham khảo trên remote) — pin rõ ràng ở đây.
+    "vietocr>=0.3.13",
+    # KHÔNG ép index CUDA riêng cho torch (khác reup-transcribe-node) — đúng cách bản ocr-service
+    # tham khảo trên remote đã làm (torch>=2.4 trơn từ PyPI mặc định, wheel GPU-enabled sẵn,
+    # không cần index đặc biệt). Bug thật gặp khi thử ép torch==2.8.0+cu128 qua index riêng:
+    # xung đột PIN CỨNG với paddlepaddle-gpu (index CUDA riêng của Paddle) trên các gói
+    # nvidia-*-cu12 dùng chung (vd nvtx-cu12==12.8.90 vs ==12.9.19) — "No solution found when
+    # resolving dependencies". Để torch trơn tự chọn bản tương thích, tránh ép 2 toolkit CUDA
+    # khác nhau cùng lúc vào 1 venv.
+    "torch>=2.4",
+    "torchvision>=0.19",
+    "Pillow>=10.0",
+    "numpy>=1.24,<2.0",
+    "opencv-python-headless>=4.8",
+    # gdown (vietocr dependency) còn import pkg_resources, bị setuptools>=82 gỡ hẳn — cùng vấn
+    # đề đã gặp ở ocr-service tham khảo trên remote.
+    "setuptools>=61.0,<82",
+]
+
+# Node này không phải 1 package Python thật (chỉ vài script chạy trực tiếp qua
+# uvicorn --app-dir/python3), tắt build project của uv — chỉ dùng làm resolver dependency.
+[tool.uv]
+package = false
+# torch (bản mới nhất tự resolve, vd 2.13.0) cần symbol ncclCommResume trong libtorch_cuda.so
+# lúc import — chỉ có ở nvidia-nccl-cu12 khá mới. paddlepaddle-gpu (index cu129) PIN CỨNG đúng
+# 1 bản nvidia-nccl-cu12 cũ hơn (2.27.3, thiếu symbol này) — resolver coi bản đó hợp lệ với ràng
+# buộc lỏng "torch>=..." của torch nên chọn luôn, nhưng vỡ thật lúc chạy (ImportError: undefined
+# symbol: ncclCommResume). Single-GPU inference (không multi-GPU distributed) nên ép hẳn 1 bản
+# NCCL mới đủ cho torch dùng chung với paddle an toàn (NCCL hầu như không được cả 2 bên gọi tới
+# ở chế độ 1 GPU).
+override-dependencies = [
+    "nvidia-nccl-cu12>=2.28",
+]
+
+[[tool.uv.index]]
+name = "paddle"
+url = "https://www.paddlepaddle.org.cn/packages/stable/cu129/"
+explicit = true
+
+[tool.uv.sources]
+paddlepaddle-gpu = [{ index = "paddle" }]

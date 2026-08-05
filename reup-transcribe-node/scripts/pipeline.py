@@ -36,12 +36,25 @@ from audio_utils import extract_audio
 
 SAMPLE_RATE = 16000
 ZH_PREFIX = "zh"
-MAX_SEGMENT_SECONDS = 20.0
+MAX_SEGMENT_SECONDS = 15.0
+# 20.0 -> 15.0 (2026-08-04): bug thật gặp job 80f7b581 (video highlight cắt dựng nhanh, lời
+# bình chồng thoại phim, gần như không có khoảng lặng) — 1 đoạn 18.35s (DƯỚI ngưỡng 20s cũ) bị
+# VAD coi là 1 vùng thoại liên tục, gộp nhiều câu KHÔNG liên quan (ngữ nghĩa) vào 1 segment,
+# dịch ra 1 khối sai be bét ("hai trăm khối" thay vì tiền "200 tệ"). Hạ ngưỡng để lưới an toàn
+# _split_long_ranges() bắt được sớm hơn các trường hợp tương tự. Đánh đổi: cắt ngang câu tự
+# nhiên NHIỀU hơn — chấp nhận được vì merge_dangling_sentence_segments() (translate-node) đã
+# tồn tại sẵn để vá đúng chiều "cắt dư" này; không có cơ chế nào vá chiều ngược lại (gộp thiếu).
+#
 # VAD (fsmn-vad) đôi khi gộp thoại liên tục dài (>60s) thành 1 segment duy nhất khi không
 # tìm được khoảng lặng rõ — đã gây 2 lỗi thật: TTS tràn slot (segments_cli.py) và mov_text
 # (soft sub trong docker_ffmpeg-edit) bị lỗi/cắt video khi 1 cue quá dài (>1800 ký tự).
 # Chặn ở đây (thay vì sửa từng chỗ dùng) để áp dụng cho MỌI downstream: TTS, subtitle,
 # translate — cả nhánh review lẫn dialogue.
+MAX_END_SILENCE_MS = 400
+# Tham số THẬT của FunASR fsmn-vad (mặc định 800ms nếu không set — đang không set trước đây).
+# Hạ xuống 400ms để VAD kết thúc 1 đoạn sớm hơn sau khoảng lặng ngắn, bắt đúng ranh giới giữa
+# các câu thoại rời rạc trong video cắt dựng nhanh (root cause job 80f7b581 — xem
+# MAX_SEGMENT_SECONDS ở trên). Cùng đánh đổi/lý do chấp nhận được như trên.
 
 CACHE_DIR = os.environ.get("MODEL_CACHE_DIR", "/cache")
 GPU_DEVICE = "cuda" if os.environ.get("TRANSCRIBE_DEVICE", "cuda") == "cuda" else "cpu"
@@ -88,7 +101,14 @@ def run_vad(wav_path: Path) -> list[tuple[float, float]]:
     # XÁC NHẬN CẦN LÀM KHI BUILD: đúng tên/đơn vị tham số này theo bản FunASR đang cài (có
     # thể không tồn tại hoặc tên khác). Dù đúng hay sai, `_split_long_ranges()` bên dưới
     # vẫn là lưới an toàn cuối cùng — không phụ thuộc hoàn toàn vào tham số này.
-    res = vad.generate(input=str(wav_path), max_single_segment_time=int(MAX_SEGMENT_SECONDS * 1000))
+    # max_end_silence_time (ms): tham số THẬT khác của fsmn-vad, quyết định khoảng lặng tối
+    # thiểu để VAD coi là kết thúc 1 đoạn thoại (mặc định 800ms nếu không set) — xem
+    # MAX_END_SILENCE_MS phía trên cho root cause/lý do hạ xuống 400ms.
+    res = vad.generate(
+        input=str(wav_path),
+        max_single_segment_time=int(MAX_SEGMENT_SECONDS * 1000),
+        max_end_silence_time=MAX_END_SILENCE_MS,
+    )
     raw_segments = res[0].get("value", [])
     ranges = [(beg / 1000.0, end / 1000.0) for beg, end in raw_segments]
     return _split_long_ranges(ranges, MAX_SEGMENT_SECONDS)

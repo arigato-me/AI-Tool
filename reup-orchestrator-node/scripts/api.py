@@ -23,7 +23,7 @@ ROLE = "orchestrator-worker"
 TTS_URL = os.environ.get("TTS_URL", "http://reup-tts-gpu-node-api:8000")
 EDITOR_URL = os.environ.get("EDITOR_URL", "http://reup-editor-node-api:8000")
 
-# Tên hiển thị + URL health của 5 node kia, dùng cho GET /nodes/status (đèn xanh/đỏ dashboard
+# Tên hiển thị + URL health của 6 node kia, dùng cho GET /nodes/status (đèn xanh/đỏ dashboard
 # monitor). Orchestrator tự thêm chính nó vào (đọc thẳng Redis, không cần HTTP tới chính mình).
 OTHER_NODES = {
     "ytdlp": os.environ.get("YTDLP_URL", "http://reup-ytdlp-node-api:8000"),
@@ -31,6 +31,7 @@ OTHER_NODES = {
     "translate": os.environ.get("TRANSLATE_URL", "http://reup-translate-node-api:8000"),
     "tts-gpu": TTS_URL,
     "editor": os.environ.get("EDITOR_URL", "http://reup-editor-node-api:8000"),
+    "ocr": os.environ.get("OCR_URL", "http://ocr-node-api:8000"),
 }
 
 # Đọc trực tiếp filesystem (mount read-only riêng cho api, xem docker-compose.yml) thay vì đi
@@ -55,10 +56,23 @@ conn = redis_lib.Redis.from_url(REDIS_URL)
 app = FastAPI()
 
 
+class BookDocument(BaseModel):
+    data_b64: str
+    ext: str
+
+
 class PipelineRequest(BaseModel):
-    url: str
+    # Bắt buộc cho mọi mode TRỪ "book" (nhánh sách dùng `documents` thay vì url — xem validate ở
+    # submit_pipeline() bên dưới, Pydantic không ép được ràng buộc "1 trong 2 tuỳ mode" gọn hơn
+    # if/else thường).
+    url: str | None = None
     video_name: str | None = None
     mode: str = "review"
+    # mode="book" — 1 HOẶC NHIỀU file pdf/docx/pptx/xlsx/ảnh upload tay (base64), xem
+    # reup-orchestrator-node/scripts/pipeline_runner.py::_run_book_pipeline. List (không phải 1
+    # field đơn) để hỗ trợ sách chụp nhiều ảnh (1 ảnh/trang) — gộp theo đúng thứ tự mảng.
+    documents: list[BookDocument] = []
+    ocr_lang: str = "vi"  # "vi" (PaddleOCR detect + VietOCR) | "en"/"fr" (PaddleOCR gốc) — xem ocr-node
     ytdlp_args: list[str] = []
     align: bool = False
     source_lang: str = "zh"  # "zh" (Paraformer) | "other" (whisper) — chọn thẳng trên web,
@@ -154,8 +168,15 @@ def translate_tokens_stats() -> dict:
 
 @app.post("/pipelines")
 def submit_pipeline(req: PipelineRequest) -> dict:
-    if req.mode not in ("review", "dialogue", "subtitle", "audio", "video"):
+    if req.mode not in ("review", "dialogue", "subtitle", "audio", "video", "book"):
         return {"ok": False, "error": f"mode không hợp lệ: {req.mode}"}
+    if req.mode == "book":
+        if not req.documents:
+            return {"ok": False, "error": "mode='book' cần documents (ít nhất 1 file)"}
+        if req.ocr_lang not in ("vi", "en", "fr"):
+            return {"ok": False, "error": f"ocr_lang không hợp lệ: {req.ocr_lang!r} (chỉ nhận 'vi'/'en'/'fr')"}
+    elif not req.url:
+        return {"ok": False, "error": "thiếu url"}
     job_id = q.new_job(conn, req.model_dump())
     return {"ok": True, "pipeline_id": job_id}
 

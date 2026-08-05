@@ -31,6 +31,7 @@ docker_build/
 ├── reup-tts-gpu-node/      # TTS stage — VieNeu-TTS on GPU, builds from repo_github/VieNeu-TTS
 ├── reup-editor-node/       # final mux/edit stage — ffmpeg (edit/srt/mix-dialogue/mix-music)
 ├── reup-orchestrator-node/ # sequences the 5 nodes above into full pipeline runs (POST /pipelines)
+├── ocr-node/               # extract stage for the "Book → Audio" branch — pdf/docx/pptx/xlsx/image -> transcript JSON
 ├── reup-ui/                # operator web UI (React/Vite + nginx), talks to the orchestrator
 ├── repo_github/
 │   ├── yt-dlp/              # vendored yt-dlp source, patched for Douyin support
@@ -80,8 +81,8 @@ docker compose down
 
 Ports: `reup-translate-node` 8101, `reup-ytdlp-node` 8102, `reup-editor-node` 8103,
 `reup-transcribe-node` 8104, `reup-tts-gpu-node` 8105, `reup-orchestrator-node` 8106,
-`reup-ui` 8107 (`reup-broker`'s Redis has no host-exposed port, only reachable on the internal
-`reup-net` network).
+`reup-ui` 8107, `ocr-node` 8108 (`reup-broker`'s Redis has no host-exposed port, only reachable
+on the internal `reup-net` network).
 
 Every node's own README documents its exact `POST /jobs` body shape and any node-specific
 behavior — read that first rather than assuming a shared contract beyond `POST /jobs` +
@@ -128,8 +129,9 @@ không đổi kiến trúc gốc):
   `POST /pipelines` — hàng đợi Redis sẵn có của `reup-orchestrator-node` tự xử lý lần lượt,
   không cần đợi xong video này mới tạo video kia.
 - **Monitor dashboard** (`reup-ui` trang `#/monitor`, `GET /nodes/status` + `GET /health` +
-  `GET /voices`/`GET /styles` trên orchestrator): đèn xanh/đỏ 6 worker, pending/processing/tổng
-  job, số video xử lý xong hôm nay/tuần/tháng, bảng job phân trang (tối đa 200 gần nhất).
+  `GET /voices`/`GET /styles` trên orchestrator): đèn xanh/đỏ 7 worker (gồm `ocr-node`),
+  pending/processing/tổng job, số video xử lý xong hôm nay/tuần/tháng, bảng job phân trang (tối
+  đa 200 gần nhất).
 - **Structured log 2 ngày** (mọi `reup-*-node`, JSONL tại `data/logs/YYYY-MM-DD.jsonl`, mount
   `/logs`, toggle `EVENT_LOG_ENABLED`): mỗi request orchestrator gửi 5 node con đều kèm
   `pipeline_id`/`video_name` — cho phép `grep` xuyên log cả 6 node theo đúng 1 pipeline để tra
@@ -211,6 +213,45 @@ final_track.wav
   ▼
 final.mp4
 ```
+
+**Nhánh Sách → Audio** (`mode=book` ở `POST /pipelines` — KHÔNG có url/video nguồn, input là 1
+file pdf/docx/pptx/xlsx/ảnh upload tay qua `document_b64`+`document_ext`; audiobook nhiều giọng,
+mỗi nhân vật 1 giọng riêng, người dẫn chuyện 1 giọng riêng):
+
+```
+[file pdf/docx/pptx/xlsx/ảnh]
+  │ ocr-node
+  │   Tier 1 (CPU, MarkItDown/PyMuPDF text layer) + Tier 2 (GPU, PaddleOCR/VietOCR — chỉ
+  │   chạy cho trang scan/ảnh, join khoá GPU chung với transcribe/tts-gpu, priority thấp nhất)
+  ▼
+transcript.json (timestamp GIẢ — ước lượng tốc độ đọc, không phải audio thật)
+  │ reup-translate-node (tag_speakers=True)
+  │   dịch + gán speaker ('narrator' hoặc tên nhân vật) mỗi segment, dùng chung glossary tên
+  │   riêng đã có để nhất quán xuyên suốt sách (xem translate_cli.py::tag_speakers)
+  ▼
+translated.json (mỗi segment thêm field 'speaker')
+  │ reup-orchestrator-node: build map speaker->voice (narrator = voice người dùng chọn,
+  │   nhân vật khác auto round-robin từ /voices), gọi reup-tts-gpu-node cmd="tts" TUẦN TỰ
+  │   từng segment (đổi voice theo map) — không dùng subcommand "segments" (đó là timeline-
+  │   based, không hợp sách không có audio gốc)
+  ▼
+N file wav (1/segment)
+  │ orchestrator: ffmpeg concat demuxer + re-encode libmp3lame — KHÔNG qua reup-editor-node
+  │   (không có video để mux/burn sub)
+  ▼
+book_<tên>.mp3 (hoặc book_final.mp3)
+```
+
+| Node | Chức năng | Input | Output |
+|---|---|---|---|
+| `ocr-node` | Tier 1 MarkItDown (docx/pptx/xlsx) + PyMuPDF text layer (pdf) — CPU, không GPU; Tier 2 PaddleOCR detect + VietOCR/PaddleOCR recognize cho trang scan/ảnh — GPU, join khoá chung transcribe/tts-gpu | pdf/docx/pptx/xlsx/ảnh | `transcript.json` (timestamp giả) |
+
+Khác nhánh video: không qua `reup-ytdlp-node`/`reup-transcribe-node`/`reup-editor-node`; `voice`
+người dùng chọn trên form chỉ áp cho `narrator`, không hỗ trợ clone giọng (`ref_audio_b64`) —
+clone chỉ cho 1 giọng, không hợp round-robin nhiều nhân vật. Xem `ocr-node/README.md` và
+`reup-orchestrator-node/README.md` mục "Sách → Audio" cho chi tiết đầy đủ + các đơn giản hoá đã
+chấp nhận ở bản đầu (chưa streaming per-page cho pdf hàng nghìn trang, chưa OOM-guard/CUDA-retry,
+audit-trail per-trang riêng).
 
 **Quy ước tag image theo version**: `:local` bị ghi đè mỗi lần `docker compose build`, không có
 đường lùi. Trước khi build đè 1 image dự định giữ lại lâu dài, tag thêm bản cụ thể trước:

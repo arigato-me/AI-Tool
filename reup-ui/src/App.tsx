@@ -80,21 +80,27 @@ export default function App() {
           )}
         </button>
         <nav className="nav-links" data-open={menuOpen} onClick={() => setMenuOpen(false)}>
-          <a href="#/submit" className={route.name === "submit" ? "active" : ""}>
-            Tạo job
-          </a>
-          <a href="#/import" className={route.name === "import" ? "active" : ""}>
-            Tạo nhiều job
-          </a>
-          <a href="#/jobs" className={route.name === "jobs" ? "active" : ""}>
-            Danh sách job
-          </a>
-          <a href="#/monitor" className={route.name === "monitor" ? "active" : ""}>
-            Monitor
-          </a>
-          <a href="#/music" className={route.name === "music" ? "active" : ""}>
-            Nhạc nền
-          </a>
+          <div className="nav-group">
+            <a href="#/submit" className={route.name === "submit" ? "active" : ""}>
+              Tạo job
+            </a>
+            <a href="#/import" className={route.name === "import" ? "active" : ""}>
+              Tạo nhiều job
+            </a>
+          </div>
+          <div className="nav-group">
+            <a href="#/jobs" className={route.name === "jobs" ? "active" : ""}>
+              Danh sách job
+            </a>
+            <a href="#/monitor" className={route.name === "monitor" ? "active" : ""}>
+              Monitor
+            </a>
+          </div>
+          <div className="nav-group">
+            <a href="#/music" className={route.name === "music" ? "active" : ""}>
+              Nhạc nền
+            </a>
+          </div>
         </nav>
       </header>
       <main>

@@ -15,3 +15,16 @@
 douyin.com:
   max_requests: 5
   window_s: 600
+
+# youtube.com và youtu.be là 2 DOMAIN KHÁC NHAU (không phải subdomain của nhau — xem
+# _domain_of()/khớp hậu tố trong rate_limit_wait()), phải khai riêng cả 2 thì link rút gọn
+# "youtu.be" mới bị giới hạn cùng mức với "youtube.com" — thiếu 1 trong 2 sẽ có link lọt qua
+# không giới hạn gì. Bug thật gặp: 8 job CSV bắn link YouTube gần như cùng lúc (~150s) khiến
+# 1 job dính "HTTP 503 Service Unavailable" — nghi YouTube tạm chặn do dồn dập. Giá trị khởi
+# điểm cùng mức thận trọng với douyin.com, nới/thắt lại nếu cần sau khi quan sát thêm.
+youtube.com:
+  max_requests: 5
+  window_s: 600
+youtu.be:
+  max_requests: 5
+  window_s: 600

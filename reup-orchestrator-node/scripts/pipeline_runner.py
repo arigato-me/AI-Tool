@@ -13,9 +13,12 @@ from __future__ import annotations
 
 import base64
 import glob
+import json
 import os
 import re
 import shutil
+import subprocess
+import tempfile
 import time
 from pathlib import Path
 
@@ -53,6 +56,7 @@ TRANSCRIBE_URL = os.environ.get("TRANSCRIBE_URL", "http://reup-transcribe-node-a
 TRANSLATE_URL = os.environ.get("TRANSLATE_URL", "http://reup-translate-node-api:8000")
 TTS_URL = os.environ.get("TTS_URL", "http://reup-tts-gpu-node-api:8000")
 EDITOR_URL = os.environ.get("EDITOR_URL", "http://reup-editor-node-api:8000")
+OCR_URL = os.environ.get("OCR_URL", "http://ocr-node-api:8000")
 
 NODES = {
     "ytdlp": {"downloads": Path("/nodes/ytdlp/downloads")},
@@ -60,8 +64,86 @@ NODES = {
     "translate": {"source": Path("/nodes/translate/source"), "outputs": Path("/nodes/translate/outputs")},
     "tts": {"source": Path("/nodes/tts/source"), "outputs": Path("/nodes/tts/outputs")},
     "editor": {"source": Path("/nodes/editor/source"), "outputs": Path("/nodes/editor/outputs")},
+    "ocr": {"source": Path("/nodes/ocr/source"), "outputs": Path("/nodes/ocr/outputs")},
 }
 OWN_OUTPUTS = Path("/outputs")
+
+NARRATOR_SPEAKER = "narrator"
+
+
+def _get_voice_pool() -> list[str]:
+    """Danh sách id giọng có sẵn — dùng để auto gán giọng cho từng nhân vật (mode="book",
+    xem _assign_speaker_voices() bên dưới). Lỗi (tts-gpu-node down...) trả rỗng, để caller tự
+    fallback về giọng mặc định thay vì phá cả pipeline chỉ vì bước phụ trợ này."""
+    try:
+        result = submit_and_wait(TTS_URL, {"cmd": "list-voices", "params": {}}, timeout=60)
+    except NodeJobError:
+        return []
+    return [v["id"] for v in result.get("voices", []) if v.get("id")]
+
+
+def _assign_speaker_voices(segments: list[dict], default_voice: str | None) -> dict[str, str]:
+    """Map speaker ('narrator' hoặc tên nhân vật, gán bởi reup-translate-node::tag_speakers) ->
+    voice id. `narrator` luôn dùng `default_voice` (giọng người dùng chọn trên form, hoặc giọng
+    đầu tiên trong pool nếu không chọn) — các nhân vật khác auto gán round-robin từ pool giọng
+    còn lại (KHÔNG có UI để người dùng tự gán tay từng nhân vật ở bản MVP này — thêm sau nếu cần
+    đích danh 1 giọng cho nhân vật chính). Hết pool thì vòng lại từ đầu, chấp nhận trùng giọng
+    giữa các nhân vật phụ."""
+    pool = _get_voice_pool()
+    narrator_voice = default_voice or (pool[0] if pool else "")
+    other_pool = [v for v in pool if v != narrator_voice] or pool or ([default_voice] if default_voice else [])
+
+    speaker_voice: dict[str, str] = {NARRATOR_SPEAKER: narrator_voice}
+    seen_others: list[str] = []
+    for seg in segments:
+        sp = seg.get("speaker") or NARRATOR_SPEAKER
+        if sp != NARRATOR_SPEAKER and sp not in seen_others:
+            seen_others.append(sp)
+    for i, sp in enumerate(seen_others):
+        speaker_voice[sp] = other_pool[i % len(other_pool)] if other_pool else narrator_voice
+    return speaker_voice
+
+
+# ~2 trang giấy A4 (~3000 ký tự/trang, ước lượng phổ biến trong xuất bản) — ngưỡng để quyết
+# định có trả thẳng nội dung text trong result JSON (reup-ui hiện box đọc ngay) hay không (sách
+# dài thì chỉ có file .txt tải riêng, không nhét text lớn vào Redis job hash).
+BOOK_TEXT_PREVIEW_MAX_CHARS = 6000
+
+
+def _format_book_text(segments: list[dict]) -> str:
+    """Ghép segments đã dịch+gán vai thành 1 văn bản đọc được — dòng của narrator để trần,
+    dòng nhân vật khác có nhãn `[Tên]` đứng trước để dễ theo dõi ai đang nói (khớp mp3 nhiều
+    giọng, không phải chỉ 1 giọng đọc thẳng)."""
+    lines = []
+    for seg in segments:
+        speaker = seg.get("speaker") or NARRATOR_SPEAKER
+        text = seg.get("text", "")
+        if speaker == NARRATOR_SPEAKER:
+            lines.append(text)
+        else:
+            lines.append(f"[{speaker}] {text}")
+    return "\n".join(lines)
+
+
+def _concat_wavs_to_mp3(wav_paths: list[Path], output_mp3: Path) -> None:
+    """Nối các file wav (mỗi segment 1 file, xem bước tts trong nhánh mode="book") thành 1 mp3
+    cuối — ffmpeg concat demuxer + re-encode `libmp3lame` (không dùng `-c copy`, tránh yêu cầu
+    mọi input phải khớp y hệt sample rate/kênh — ffmpeg tự decode từng file trước khi encode lại
+    1 lần). Không chèn khoảng lặng giữa các đoạn (đơn giản nhất chạy được trước — thêm nếu nghe
+    bị cụt/gấp giữa các câu)."""
+    output_mp3.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as list_file:
+        for wav in wav_paths:
+            list_file.write(f"file '{wav.resolve()}'\n")
+        list_path = list_file.name
+    try:
+        cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", list_path,
+               "-c:a", "libmp3lame", "-q:a", "2", str(output_mp3)]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+        if proc.returncode != 0:
+            raise NodeJobError(f"ffmpeg concat (nhánh sách) lỗi: {proc.stderr[-2000:]}")
+    finally:
+        Path(list_path).unlink(missing_ok=True)
 
 
 def _copy(src: Path, dst_dir: Path, dst_name: str | None = None) -> Path:
@@ -111,42 +193,16 @@ def run_pipeline(pipeline_id: str, payload: dict, conn=None, resume_stages: dict
         raise
 
 
-def _run_pipeline_impl(
-    pipeline_id: str, payload: dict, stages: dict[str, dict], conn=None, resume_stages: dict | None = None,
-) -> dict:
-    resume_stages = resume_stages or {}
-    mode = payload.get("mode", "review")
-    if mode not in ("review", "dialogue", "subtitle", "audio", "video"):
-        raise ValueError(f"mode không hợp lệ: {mode}")
-    url = payload["url"]
-    # Client thường paste nguyên văn bảng share (đt Douyin/TikTok...) kèm rác quanh link
-    # (vd "3.82 复制打开抖音... https://v.douyin.com/xxx/ v@s.RX...") — tách link http(s) đầu
-    # tiên ra trước khi đưa cho yt-dlp, tránh lỗi "[generic] '<toàn bộ chuỗi>' is not a valid URL".
-    url_match = re.search(r'https?://\S+', url)
-    if url_match:
-        url = url_match.group(0)
-    align = bool(payload.get("align", False))
-    source_lang = payload.get("source_lang", "zh")
-    if source_lang not in ("zh", "other"):
-        raise ValueError(f"source_lang không hợp lệ: {source_lang}")
-    voice = payload.get("voice")
-    style = payload.get("style")
-    ref_audio_b64 = payload.get("ref_audio_b64")
-    ref_audio_ext = payload.get("ref_audio_ext") or "wav"
-    subtitle_mode = payload.get("subtitle_mode", "burn")
-    sub_style = payload.get("sub_style")
-    target_lang = payload.get("target_lang", "tiếng Việt")
-    batch_size = int(payload.get("batch_size", 20))
-
-    # Tên chuẩn xuyên suốt pipeline: nếu người dùng đặt tên video, dùng làm prefix cho mọi
-    # file trung gian (kèm 8 ký tự đầu pipeline_id để không đụng file giữa các lần chạy trên
-    # cùng dir chia sẻ của từng node) và làm tên file xuất cuối (final.mp4 -> <tên>.mp4). Không
-    # đặt tên -> giữ nguyên hành vi cũ (prefix = pipeline_id, xuất "final.mp4"/"final.srt").
-    video_name = _sanitize_video_name(payload.get("video_name"))
-    stem = f"{video_name}_{pipeline_id[:8]}" if video_name else pipeline_id
-    # File xuất cuối luôn có tag nhánh (review_/dialogue_) đứng trước tên video — dễ phân biệt
-    # 2 nhánh khi nhìn thẳng vào tên file, không cần mở JSON payload.
-    export_stem = f"{mode}_{video_name}" if video_name else f"{mode}_final"
+def _make_run_stage(
+    pipeline_id: str, video_name: str | None, stages: dict[str, dict], conn, resume_stages: dict,
+):
+    """Factory trả về `(_run_stage, _resumed_result, _mark_resumed)` — tách ra thành hàm dùng
+    chung cho cả `_run_pipeline_impl()` (5 bước video review/dialogue/subtitle) và
+    `_run_book_pipeline()` (nhánh sách->audio, xem bên dưới) thay vì định nghĩa lặp lại 2 lần
+    logic resume/cancel/persist-job-id/error-mapping giống hệt nhau. `_resumed_result`/
+    `_mark_resumed` được trả riêng (không chỉ gói trong `_run_stage`) vì bước `ytdlp` cần gọi
+    trực tiếp 2 hàm này — resume check của nó dựa trên glob file đã tải (không phải 1 path cố
+    định), không đi qua tham số `resume_check` chuẩn của `_run_stage`."""
 
     def _resumed_result(name: str, check_path: Path | None) -> dict | None:
         """Trả `result` cũ nếu stage `name` đã `finished` ở lần chạy trước (đọc từ
@@ -179,7 +235,7 @@ def _run_pipeline_impl(
         if conn is not None and q.is_cancel_requested(conn, pipeline_id):
             raise PipelineCancelled(f"huỷ trước khi chạy bước '{name}'")
         # Gắn correlation ID vào MỌI stage tại đây (1 chỗ duy nhất) — để log của node con
-        # (translate/transcribe/tts/editor/ytdlp) tra ngược được về đúng pipeline_id/video_name
+        # (translate/transcribe/tts/editor/ytdlp/ocr) tra ngược được về đúng pipeline_id/video_name
         # khi debug lỗi chất lượng (xem plan "Structured log 2 ngày").
         body = {**body, "pipeline_id": pipeline_id, "video_name": video_name}
         if conn is not None:
@@ -239,6 +295,225 @@ def _run_pipeline_impl(
             # luôn biết chính xác bước cuối cùng đã thử tới đâu.
             stages[name] = {"status": "failed", "error": str(e), "elapsed_s": round(time.time() - t0, 1)}
             raise NodeJobError(str(e)) from e
+
+    return _run_stage, _resumed_result, _mark_resumed
+
+
+def _run_book_pipeline(
+    pipeline_id: str, payload: dict, stages: dict[str, dict], conn=None, resume_stages: dict | None = None,
+) -> dict:
+    """Nhánh "Sách → Audio" (mode="book") — input là 1 HOẶC NHIỀU file pdf/docx/pptx/xlsx/ảnh
+    upload tay (`documents`: list `[{"data_b64","ext"}, ...]`, xem `_merge_transcripts()`), KHÔNG
+    có url/video nguồn — hợp trường hợp sách chụp nhiều ảnh (1 ảnh/trang). Chuỗi bước: `ocr-node`
+    gọi TUẦN TỰ từng file (trích text, xem ocr-node/README.md) -> gộp transcript theo đúng thứ
+    tự file -> `reup-translate-node` (dịch + gán vai `tag_speakers=True`, xem
+    translate_cli.py::tag_speakers) -> `reup-tts-gpu-node` gọi TUẦN TỰ subcommand `tts` cho TỪNG
+    segment (đổi `voice` theo speaker->voice map, xem `_assign_speaker_voices()`) -> nối tất cả
+    wav bằng ffmpeg (`_concat_wavs_to_mp3()`) thành 1 file mp3 cuối. KHÔNG qua `reup-editor-node`
+    (không có video để mux/burn sub) — final output là mp3 thẳng.
+
+    Chưa hỗ trợ clone giọng (`ref_audio_b64`) ở nhánh này — giọng clone chỉ là 1 giọng, không
+    dùng round-robin nhiều nhân vật được, để sau nếu thật sự cần."""
+    resume_stages = resume_stages or {}
+    documents = payload.get("documents") or []
+    if not documents:
+        raise ValueError("mode='book' cần 'documents' (list [{data_b64, ext}], ít nhất 1 file)")
+    ocr_lang = payload.get("ocr_lang", "vi")
+    if ocr_lang not in ("vi", "en", "fr"):
+        raise ValueError(f"ocr_lang không hợp lệ: {ocr_lang}")
+    voice = payload.get("voice")
+    style = payload.get("style")
+    target_lang = payload.get("target_lang", "tiếng Việt")
+    batch_size = int(payload.get("batch_size", 20))
+
+    video_name = _sanitize_video_name(payload.get("video_name"))
+    stem = f"{video_name}_{pipeline_id[:8]}" if video_name else pipeline_id
+    export_stem = f"book_{video_name}" if video_name else "book_final"
+    job_out_dir = OWN_OUTPUTS / pipeline_id
+
+    _run_stage, _, _ = _make_run_stage(pipeline_id, video_name, stages, conn, resume_stages)
+
+    # 1+2. Mỗi file: ghi vào /source của ocr-node (idempotent, resume không ghi đè/tải lại) +
+    # copy 1 bản sang /outputs của CHÍNH pipeline này (để reup-ui hiển thị lại ảnh/file đã import
+    # — khác /source của ocr-node, thư mục đó không được mount phục vụ HTTP cho reup-ui) + gọi
+    # ocr-node trích text — mỗi file 1 stage riêng (`ocr_00`, `ocr_01`, ...) nên resume/cancel
+    # per-file, giống hệt cơ chế `tts_seg_NNNN` bên dưới.
+    transcript_paths: list[Path] = []
+    source_files: list[str] = []
+    for i, doc in enumerate(documents):
+        ext = (doc.get("ext") or "").lstrip(".").lower()
+        data_b64 = doc.get("data_b64")
+        if not ext or not data_b64:
+            raise ValueError(f"documents[{i}] thiếu 'ext'/'data_b64'")
+        doc_name = f"{stem}_source_{i:02d}.{ext}"
+        doc_path = NODES["ocr"]["source"] / doc_name
+        doc_path.parent.mkdir(parents=True, exist_ok=True)
+        if not doc_path.exists():
+            doc_path.write_bytes(base64.b64decode(data_b64))
+        source_out = _copy(doc_path, job_out_dir, doc_name)
+        source_files.append(str(source_out))
+
+        transcript_name = f"{stem}_transcript_{i:02d}.json"
+        _run_stage(f"ocr_{i:02d}", OCR_URL, {
+            "input": f"/source/{doc_name}",
+            "output": f"/outputs/{transcript_name}",
+            "source_lang": ocr_lang,
+        }, resume_check=NODES["ocr"]["outputs"] / transcript_name)
+        transcript_paths.append(NODES["ocr"]["outputs"] / transcript_name)
+
+    # Gộp transcript nhiều file thành 1 — nối segment ĐÚNG thứ tự file (1 ảnh = 1 trang), dồn
+    # timestamp giả liên tục xuyên suốt (không reset về 0 mỗi file) để giữ ý nghĩa "tăng dần" của
+    # start/end như tài liệu 1 file, đánh số lại id 1..N cho toàn bộ.
+    merged_segments: list[dict] = []
+    running_offset = 0.0
+    for tp in transcript_paths:
+        t_data = json.loads(tp.read_text(encoding="utf-8"))
+        t_segments = t_data.get("segments") or []
+        for seg in t_segments:
+            seg["start"] = round(seg.get("start", 0.0) + running_offset, 2)
+            seg["end"] = round(seg.get("end", 0.0) + running_offset, 2)
+            merged_segments.append(seg)
+        running_offset = merged_segments[-1]["end"] if merged_segments else running_offset
+    for new_id, seg in enumerate(merged_segments, start=1):
+        seg["id"] = new_id
+    if not merged_segments:
+        raise NodeJobError("ocr không trả về segment nào cho nhánh sách")
+
+    transcript_name = f"{stem}_transcript.json"
+    transcript_path = NODES["ocr"]["outputs"] / transcript_name
+    transcript_path.write_text(
+        json.dumps({"language": ocr_lang, "duration_s": running_offset, "segments": merged_segments},
+                   ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    # 3. translate — LUÔN qua Deepseek dù ocr_lang trùng target_lang (rollback 2026-08-04: từng
+    # tắt translate khi ocr_lang="vi" để tiết kiệm token, gây bug thật — text OCR tiếng Việt hay
+    # thiếu dấu, bỏ qua Deepseek verify thì TTS đọc thẳng bản không dấu). tag_speakers=True gán
+    # narrator/tên nhân vật mỗi segment (xem translate_cli.py::tag_speakers), khác hẳn nhánh
+    # video (không bật cờ này).
+    translate_in = _copy(transcript_path, NODES["translate"]["source"])
+    translated_name = f"{stem}_translated.json"
+    _run_stage("translate", TRANSLATE_URL, {
+        "input": f"/source/{translate_in.name}",
+        "output": f"/outputs/{translated_name}",
+        "target_lang": target_lang,
+        "batch_size": batch_size,
+        "tag_speakers": True,
+    }, resume_check=NODES["translate"]["outputs"] / translated_name)
+    translated_path = NODES["translate"]["outputs"] / translated_name
+
+    translated_data = json.loads(translated_path.read_text(encoding="utf-8"))
+    segments = translated_data.get("segments") or []
+    if not segments:
+        raise NodeJobError("translate không trả về segment nào cho nhánh sách")
+
+    # 4. Map speaker -> voice — 1 lần duy nhất TRƯỚC khi loop TTS (không hỏi lại /voices mỗi
+    # segment). Đọc lại từ `resume_stages` nếu đã tính lúc chạy trước (retry) để speaker->voice
+    # KHÔNG đổi giữa các lần thử — đổi map giữa chừng sẽ làm 1 nhân vật đổi giọng nửa chừng sách.
+    cached_map = (resume_stages.get("_speaker_voice_map") or {}).get("result")
+    if cached_map:
+        speaker_voice = cached_map
+    else:
+        speaker_voice = _assign_speaker_voices(segments, voice)
+        stages["_speaker_voice_map"] = {"status": "finished", "result": speaker_voice, "elapsed_s": 0.0}
+        if conn is not None:
+            q.save_stage_progress(conn, pipeline_id, stages)
+    q.log_event({"pipeline_id": pipeline_id, "video_name": video_name,
+                 "event": "book_speaker_voice_map", "map": speaker_voice})
+
+    # 5. TTS tuần tự TỪNG segment — mỗi segment là 1 stage riêng (`tts_seg_NNNN`), tự động thừa
+    # hưởng resume/cancel per-segment của `_run_stage()` (sách dở fail giữa chừng, retry chỉ tổng
+    # hợp lại từ đúng segment còn thiếu, không synth lại từ đầu). Chậm hơn hẳn cách gọi 1 lần
+    # `segments` (timeline-based, không hợp cho sách không có audio gốc) — đánh đổi chấp nhận
+    # được để tái dùng nguyên xi contract `cmd="tts"` đã có, không sửa gì reup-tts-gpu-node.
+    seg_wavs: list[Path] = []
+    for seg in segments:
+        seg_id = seg["id"]
+        seg_voice = speaker_voice.get(seg.get("speaker") or NARRATOR_SPEAKER, voice)
+        text_name = f"{stem}_seg{seg_id:04d}.txt"
+        text_path = NODES["tts"]["source"] / text_name
+        text_path.parent.mkdir(parents=True, exist_ok=True)
+        text_path.write_text(seg["text"], encoding="utf-8")
+        wav_name = f"{stem}_seg{seg_id:04d}.wav"
+        tts_params = {"input_path": f"/source/{text_name}", "output_path": f"/outputs/{wav_name}"}
+        if seg_voice:
+            tts_params["voice"] = seg_voice
+        if style:
+            tts_params["style"] = style
+        _run_stage(f"tts_seg_{seg_id:04d}", TTS_URL, {"cmd": "tts", "params": tts_params},
+                   resume_check=NODES["tts"]["outputs"] / wav_name)
+        seg_wavs.append(NODES["tts"]["outputs"] / wav_name)
+
+    # 6. Nối tất cả wav thành 1 mp3 cuối — KHÔNG qua reup-editor-node (không có video/hình).
+    final_path = job_out_dir / f"{export_stem}.mp3"
+    _concat_wavs_to_mp3(seg_wavs, final_path)
+
+    # 7. Xuất kèm file text (nội dung đã đọc, có nhãn [Tên nhân vật] cho câu thoại — narrator
+    # để trần) cạnh mp3 — trước đây chỉ có audio, không có cách nào đọc lại nội dung đã tạo ra
+    # mà không nghe hết file. Đặt ngay CẠNH mp3 (không qua node nào khác, ghi trực tiếp).
+    text_path = job_out_dir / f"{export_stem}.txt"
+    full_text = _format_book_text(segments)
+    text_path.write_text(full_text, encoding="utf-8")
+
+    result: dict = {
+        "ok": True, "output": str(final_path), "text_output": str(text_path),
+        "video_name": video_name, "stages": stages, "source_files": source_files,
+    }
+    # Đoạn text NGẮN (< ~2 trang giấy) trả thẳng trong JSON để reup-ui hiện ngay 1 box đọc được,
+    # khỏi phải tải file .txt riêng — sách dài thì bỏ qua (result đã đủ nặng vì stages/segments,
+    # không nhét thêm text lớn vào Redis job hash).
+    if len(full_text) <= BOOK_TEXT_PREVIEW_MAX_CHARS:
+        result["text"] = full_text
+    return result
+
+
+def _run_pipeline_impl(
+    pipeline_id: str, payload: dict, stages: dict[str, dict], conn=None, resume_stages: dict | None = None,
+) -> dict:
+    resume_stages = resume_stages or {}
+    mode = payload.get("mode", "review")
+    if mode not in ("review", "dialogue", "subtitle", "audio", "video", "book"):
+        raise ValueError(f"mode không hợp lệ: {mode}")
+
+    # mode="book": KHÔNG có url/video nguồn — input là 1 file pdf/docx/pptx/xlsx/ảnh upload
+    # tay, nhánh riêng hoàn toàn tách khỏi luồng ytdlp/transcribe/editor bên dưới (không có video
+    # để mux/burn sub, không cần đồng bộ audio gốc). Tách sớm, TRƯỚC khi đọc payload["url"] (nhánh
+    # book không có field này).
+    if mode == "book":
+        return _run_book_pipeline(pipeline_id, payload, stages, conn, resume_stages)
+
+    url = payload["url"]
+    # Client thường paste nguyên văn bảng share (đt Douyin/TikTok...) kèm rác quanh link
+    # (vd "3.82 复制打开抖音... https://v.douyin.com/xxx/ v@s.RX...") — tách link http(s) đầu
+    # tiên ra trước khi đưa cho yt-dlp, tránh lỗi "[generic] '<toàn bộ chuỗi>' is not a valid URL".
+    url_match = re.search(r'https?://\S+', url)
+    if url_match:
+        url = url_match.group(0)
+    align = bool(payload.get("align", False))
+    source_lang = payload.get("source_lang", "zh")
+    if source_lang not in ("zh", "other"):
+        raise ValueError(f"source_lang không hợp lệ: {source_lang}")
+    voice = payload.get("voice")
+    style = payload.get("style")
+    ref_audio_b64 = payload.get("ref_audio_b64")
+    ref_audio_ext = payload.get("ref_audio_ext") or "wav"
+    subtitle_mode = payload.get("subtitle_mode", "burn")
+    sub_style = payload.get("sub_style")
+    target_lang = payload.get("target_lang", "tiếng Việt")
+    batch_size = int(payload.get("batch_size", 20))
+
+    # Tên chuẩn xuyên suốt pipeline: nếu người dùng đặt tên video, dùng làm prefix cho mọi
+    # file trung gian (kèm 8 ký tự đầu pipeline_id để không đụng file giữa các lần chạy trên
+    # cùng dir chia sẻ của từng node) và làm tên file xuất cuối (final.mp4 -> <tên>.mp4). Không
+    # đặt tên -> giữ nguyên hành vi cũ (prefix = pipeline_id, xuất "final.mp4"/"final.srt").
+    video_name = _sanitize_video_name(payload.get("video_name"))
+    stem = f"{video_name}_{pipeline_id[:8]}" if video_name else pipeline_id
+    # File xuất cuối luôn có tag nhánh (review_/dialogue_) đứng trước tên video — dễ phân biệt
+    # 2 nhánh khi nhìn thẳng vào tên file, không cần mở JSON payload.
+    export_stem = f"{mode}_{video_name}" if video_name else f"{mode}_final"
+
+    _run_stage, _resumed_result, _mark_resumed = _make_run_stage(pipeline_id, video_name, stages, conn, resume_stages)
 
     # 1. ytdlp — ép output đặt tên theo pipeline_id (ytdlp_runner chỉ wrap subprocess, không
     # trả "output" trong result) để glob tìm lại chắc chắn. Resume: nếu stage này đã "finished"

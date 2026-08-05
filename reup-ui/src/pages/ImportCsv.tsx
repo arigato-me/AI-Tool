@@ -14,6 +14,7 @@ import {
 import { fileToBase64 } from "../lib/fileToBase64";
 import { normalizeVideoUrl } from "../lib/normalizeUrl";
 import Dropdown from "../components/Dropdown";
+import FieldInfo from "../components/FieldInfo";
 
 const CLONE_VALUE = "__clone__";
 const NO_MUSIC_VALUE = "";
@@ -103,7 +104,11 @@ function downloadTemplate() {
 export default function ImportCsv() {
   const [voices, setVoices] = useState<Voice[]>([]);
   const [styles, setStyles] = useState<Style[]>([]);
-  const [mode, setMode] = useState<"review" | "dialogue" | "subtitle">("review");
+  const [mode, setMode] = useState<"review" | "dialogue" | "subtitle" | "audio" | "video">("review");
+  // "audio"/"video" đều dừng ngay sau ytdlp (chỉ tải, không transcribe/dịch/TTS/mux) — mọi field
+  // downstream (source_lang, voice, style, subtitle_mode, nhạc nền) đều vô nghĩa, cùng quy ước
+  // isDownloadOnly như SubmitJob.tsx.
+  const isDownloadOnly = mode === "audio" || mode === "video";
   const [sourceLang, setSourceLang] = useState<"zh" | "other">("zh");
   const [voice, setVoice] = useState("");
   const [style, setStyle] = useState("tu_nhien");
@@ -257,11 +262,20 @@ export default function ImportCsv() {
       <div className="card">
         <h2>Cài đặt chung</h2>
         <label>
-          Nhánh
+          <span className="field-label-row">
+            Nhánh
+            <FieldInfo
+              text={
+                "review: mute audio gốc, 1 giọng thuyết minh. dialogue: giữ nền gốc, chỉ mute tiếng Trung. " +
+                "subtitle: chỉ thêm phụ đề, giữ nguyên audio gốc. audio: chỉ tải mp3, không xử lý gì thêm. " +
+                "video: chỉ tải video gốc, không xử lý gì thêm."
+              }
+            />
+          </span>
           <div className="radio-group">
             <label>
               <input type="radio" name="batch-mode" checked={mode === "review"} onChange={() => setMode("review")} />
-              review (mute audio gốc)
+              review
             </label>
             <label>
               <input
@@ -270,7 +284,7 @@ export default function ImportCsv() {
                 checked={mode === "dialogue"}
                 onChange={() => setMode("dialogue")}
               />
-              dialogue (giữ nền)
+              dialogue
             </label>
             <label>
               <input
@@ -279,10 +293,19 @@ export default function ImportCsv() {
                 checked={mode === "subtitle"}
                 onChange={() => setMode("subtitle")}
               />
-              subtitle (chỉ thêm sub, giữ nguyên audio gốc)
+              subtitle
+            </label>
+            <label>
+              <input type="radio" name="batch-mode" checked={mode === "audio"} onChange={() => setMode("audio")} />
+              audio
+            </label>
+            <label>
+              <input type="radio" name="batch-mode" checked={mode === "video"} onChange={() => setMode("video")} />
+              video
             </label>
           </div>
         </label>
+        {!isDownloadOnly && (
         <label>
           Ngôn ngữ gốc video (áp dụng chung cả danh sách)
           <div className="radio-group">
@@ -306,11 +329,23 @@ export default function ImportCsv() {
             </label>
           </div>
         </label>
+        )}
         {mode === "subtitle" && (
           <p className="stage-detail">
             Nhánh subtitle không dùng TTS/giọng đọc — audio gốc được giữ nguyên, chỉ thêm phụ đề.
           </p>
         )}
+        {mode === "audio" && (
+          <p className="stage-detail">
+            Nhánh audio chỉ tải video rồi xuất mp3 cho cả danh sách — không transcribe/dịch/TTS/mux.
+          </p>
+        )}
+        {mode === "video" && (
+          <p className="stage-detail">
+            Nhánh video chỉ tải nguyên file video gốc cho cả danh sách — không transcribe/dịch/TTS/mux.
+          </p>
+        )}
+        {!isDownloadOnly && (
         <div className="row">
           {mode !== "subtitle" && (
             <label>
@@ -345,7 +380,8 @@ export default function ImportCsv() {
             />
           </label>
         </div>
-        {mode !== "subtitle" && voice === CLONE_VALUE && (
+        )}
+        {!isDownloadOnly && mode !== "subtitle" && voice === CLONE_VALUE && (
           <label>
             File audio mẫu (WAV, 3-5 giây) — dùng chung cho mọi video trong danh sách
             <input

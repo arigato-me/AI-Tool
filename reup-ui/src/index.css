@@ -76,7 +76,18 @@ textarea {
 .nav-links {
   display: flex;
   align-items: center;
+  gap: var(--space-lg);
+}
+
+.nav-group {
+  display: flex;
+  align-items: center;
   gap: var(--space-md);
+}
+
+.nav-group + .nav-group {
+  padding-left: var(--space-lg);
+  border-left: 1px solid var(--color-rule);
 }
 
 .nav-links a {
@@ -117,6 +128,20 @@ textarea {
 
   .nav-links[data-open="true"] {
     display: flex;
+  }
+
+  .nav-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3xs);
+  }
+
+  .nav-group + .nav-group {
+    padding-left: 0;
+    padding-top: var(--space-2xs);
+    margin-top: var(--space-2xs);
+    border-left: none;
+    border-top: 1px solid var(--color-rule);
   }
 
   .nav-links a {
@@ -404,6 +429,17 @@ input[type="range"] {
 .sub-style-fields input[type="checkbox"],
 .sub-style-fields input[type="color"] {
   justify-self: start;
+}
+
+.sub-style-details summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  padding: var(--space-2xs) 0;
+}
+
+.sub-style-details[open] summary {
+  margin-bottom: var(--space-2xs);
 }
 
 .sub-style-actions {

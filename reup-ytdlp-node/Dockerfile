@@ -6,8 +6,16 @@ ENV TZ=Asia/Ho_Chi_Minh \
     YTDLP_HOME=/config
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
+    && apt-get install -y --no-install-recommends ffmpeg ca-certificates curl unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# yt-dlp cần 1 JS runtime thật để giải "n challenge" của YouTube (đổi định kỳ, tự viết lại bằng
+# Python không theo kịp) — thiếu thì client "web" chỉ lấy được ảnh storyboard, không lấy được
+# format video/audio thật (bug thật gặp: video yêu cầu đăng nhập, có cookie hợp lệ vẫn chỉ ra
+# "Only images are available" tới khi cài deno). Không ảnh hưởng Douyin (không cần JS runtime).
+ENV DENO_INSTALL=/usr/local
+RUN curl -fsSL https://deno.land/install.sh | sh -s -- -y \
+    && deno --version
 
 COPY repo_github/yt-dlp /src/yt-dlp
 WORKDIR /src/yt-dlp

@@ -125,6 +125,47 @@ SYSTEM_PROMPT = (
     "order, without adding line numbers inside the translated text."
 )
 
+# Nhánh target_lang không phải tiếng Việt (hiện chỉ "tiếng Anh", nhánh sách — xem
+# _is_vietnamese_target()) — bản rút gọn của SYSTEM_PROMPT ở trên, bỏ các quy tắc CHỈ đúng cho
+# tiếng Việt (hạt xưng hô đấy/chứ/mà..., cách đánh vần số theo âm Hán-Việt) thay vì nhét
+# {target_lang} vào giữa câu tiếng Việt-cụ-thể — SYSTEM_PROMPT tiếng Việt giữ NGUYÊN, không đổi
+# 1 ký tự, nhánh video/dubbing hiện tại đi đúng y hệt đường code cũ.
+SYSTEM_PROMPT_EN = (
+    "You are a professional translator specializing in video dialogue, translating into "
+    "natural, spoken-style {target_lang} for voiceover dubbing. Preserve the exact meaning, "
+    "keep it concise, add no annotations, and do NOT invent details/context that the source "
+    "line does not contain (use the \"Additional context\" section below — if provided — only "
+    "to correctly understand an ambiguous source line, never to add new plot details). Read "
+    "the surrounding lines (before/after) in the list to track the emotional arc (happy, "
+    "angry, sarcastic, tense, worried...) and translate with matching nuance — natural spoken "
+    "phrasing, not a stiff, lifeless translation. IMPORTANT: your answer must NEVER contain "
+    "any Chinese characters — even when the source line is specialized jargon (gambling, "
+    "sports, technical...) that is hard to translate literally, you must still paraphrase it "
+    "instead of repeating/paraphrasing the original Chinese text. When a digit sequence is "
+    "used as a person's nickname/codename (e.g. \"零零七\" meaning \"007\", a James-Bond-style "
+    "alias — not a real quantity), spell it out as words in {target_lang}, NEVER as raw Arabic "
+    "digits — the voiceover TTS engine reads text literally with no number normalization, so "
+    "raw digits get mispronounced as gibberish. Each line in the list has its original "
+    "duration in seconds in parentheses — this is the ORIGINAL SPEECH LENGTH, meant only to "
+    "help you sense the pacing (short/urgent vs long/leisurely), it is NOT a hard limit — the "
+    "HIGHEST PRIORITY is a natural, continuous translation that reads like real spoken "
+    "dialogue; NEVER deliberately cut words/filler just to match that duration — a choppy, "
+    "truncated translation reads far worse than one that runs slightly longer than the "
+    "source. Only consider trimming when the translation would clearly end up at least 1.5x "
+    "longer than the source (genuinely verbose/redundant) — this does not apply to lines of "
+    "normal or slightly longer length."
+    " You will receive a numbered list of lines. Return EXACTLY one JSON object of the form "
+    "{{\"translations\": [\"...\", \"...\"]}} with the same number of elements, in the same "
+    "order, without adding line numbers inside the translated text."
+)
+
+
+def _is_vietnamese_target(target_lang: str) -> bool:
+    """1 chỗ duy nhất quyết định route tiếng Việt (nguyên trạng, mọi nhánh video hiện tại) hay
+    tiếng khác (nhánh sách target_lang="tiếng Anh", xem SYSTEM_PROMPT_EN/REVIEW_SYSTEM_PROMPT_EN
+    + text_looks_untranslated() + translate_with_fallback() Google-rescue gate)."""
+    return "việt" in target_lang.lower() or "vietnamese" in target_lang.lower()
+
 # Tóm tắt NGỮ CẢNH nội bộ (dùng làm context truyền vào call_deepseek/_review_chunk, xem
 # summarize_video_context) — KHÔNG cần ép ngôn ngữ gì cả, cứ để model tóm tắt tự nhiên bằng
 # ngôn ngữ lời thoại gốc. Model đọc context tiếng Trung để dịch ĐÚNG câu thoại tiếng Trung sang
@@ -169,10 +210,28 @@ DESCRIBE_TRANSLATED_SYSTEM_PROMPT = (
 
 REVIEW_CHUNK_SIZE = 60  # số segment rà soát mỗi lượt gọi — đủ nhỏ để model đọc kỹ, đủ lớn để thấy mạch chuyện
 REVIEW_CONTEXT_OVERLAP = 10  # số segment liền trước đưa vào làm ngữ cảnh (không sửa) — giữ mạch liền giữa các chunk
+
+# Gán vai (speaker) cho nhánh sách (mode="book", xem tag_speakers() dưới) — dùng CHUNG
+# REVIEW_CHUNK_SIZE/REVIEW_CONTEXT_OVERLAP với review_translation_context() thay vì hằng số
+# riêng: cùng lý do cần "đọc đủ ngữ cảnh xung quanh + nhất quán xuyên suốt nhiều chunk" như review
+# tên riêng, không cần tách config riêng.
+SPEAKER_TAG_SYSTEM_PROMPT = (
+    "You are analyzing a chunk of a story/book (already translated) to identify who is "
+    "speaking each line, for a multi-voice audiobook narration. You receive a continuous "
+    "chunk, each line with an id and its text. For each line, decide: \"narrator\" if it is "
+    "narration/description (not spoken dialogue), or the SPEAKING CHARACTER's name if the line "
+    "is dialogue spoken by a character (infer from dialogue attribution like \"said X\"/\"X "
+    "asked\", or from turn-taking in a conversation). Use the EXACT SAME name for the same "
+    "character throughout the whole chunk — a name glossary may be given below, reuse those "
+    "names exactly, do not invent variant spellings. Lines marked [CONTEXT — CHỈ THAM KHẢO] are "
+    "for context only, do NOT include them in the result. Return EXACTLY one JSON object of the "
+    "form {\"speakers\": {\"<id>\": \"narrator or character name\"}}, one entry per non-context "
+    "line id, no explanation."
+)
 # Đổi sang tiếng Anh cùng đợt với SYSTEM_PROMPT — có ép output tường minh qua target_lang nối
 # cuối (giống call_deepseek), không dính rủi ro "mirror ngôn ngữ input" như RAW_SUMMARY/DESCRIBE.
 REVIEW_SYSTEM_PROMPT = (
-    "You are an editor reviewing a video subtitle translation into Vietnamese. You receive a "
+    "You are an editor reviewing a video subtitle translation into {target_lang}. You receive a "
     "continuous chunk of the video script, each line with an id, the original Chinese line, "
     "and its translation. Read the whole chunk to grasp the context, character personalities, "
     "and the emotional arc throughout. Only FIX translations that: (1) don't match the "
@@ -183,7 +242,7 @@ REVIEW_SYSTEM_PROMPT = (
     "translation adds \"after work\"/a place/time not present in the source) — fix these to "
     "stay closer to the source. Do NOT touch lines that are already fine. Lines marked "
     "[CONTEXT — DO NOT EDIT] are for context only, do NOT include them in the result. Return "
-    "EXACTLY one JSON object of the form {\"revisions\": {\"<id>\": \"<new translation>\"}} — "
+    "EXACTLY one JSON object of the form {{\"revisions\": {{\"<id>\": \"<new translation>\"}}}} — "
     "list ONLY ids that truly need fixing, skip ids that don't need changing, no explanation."
 )
 
@@ -219,6 +278,11 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=20,
         help="Số segment dịch mỗi lần gọi API (mặc định: 20)",
+    )
+    parser.add_argument(
+        "--tag-speakers",
+        action="store_true",
+        help="Gán vai (narrator/tên nhân vật) cho từng segment — dùng cho nhánh sách (mode=book)",
     )
     return parser.parse_args()
 
@@ -277,7 +341,7 @@ def call_deepseek(
     temperature: float = 0.3, context: str = "", usage: "UsageTracker | None" = None,
 ) -> list[str]:
     numbered = "\n".join(f"{i} ({d:.1f}s): {t}" for i, (t, d) in enumerate(zip(texts, durations)))
-    system_content = SYSTEM_PROMPT
+    system_content = SYSTEM_PROMPT if _is_vietnamese_target(target_lang) else SYSTEM_PROMPT_EN.format(target_lang=target_lang)
     if context:
         system_content += f"\n\nAdditional context (reference only, for correct meaning/consistent proper nouns, do not invent): {context}"
     system_content += f" Target language: {target_lang}."
@@ -497,19 +561,25 @@ def describe_translated_video(
     return summary.strip() if isinstance(summary, str) else ""
 
 
-def text_looks_untranslated(translated: str) -> bool:
+def text_looks_untranslated(translated: str, target_lang: str = "tiếng Việt") -> bool:
     """1 câu dịch coi là "chưa dịch" nếu (1) còn nhiều CJK (Deepseek trả nguyên văn gốc)
-    hoặc (2) đủ dài (>=12 ký tự) mà không có dấu tiếng Việt nào (nghi dịch sang ngôn ngữ
-    khác, vd tiếng Anh). Check TỪNG CÂU thay vì cả batch — bản cũ tính % lỗi trên cả batch
+    hoặc (2) target là tiếng Việt VÀ đủ dài (>=12 ký tự) mà không có dấu tiếng Việt nào (nghi
+    dịch sang ngôn ngữ khác). Check TỪNG CÂU thay vì cả batch — bản cũ tính % lỗi trên cả batch
     20 câu nên 1-2 câu lỗi lẻ tẻ (vd 10%) không đủ ngưỡng, lọt qua không retry (bug thật
-    gặp: 2 câu bị bỏ sót nguyên tiếng Trung giữa 1 batch 20 câu dịch đúng)."""
+    gặp: 2 câu bị bỏ sót nguyên tiếng Trung giữa 1 batch 20 câu dịch đúng).
+
+    Check dấu tiếng Việt CHỈ áp dụng khi target_lang là tiếng Việt (mặc định, mọi nhánh video
+    hiện tại — hành vi giữ NGUYÊN) — target khác (vd nhánh sách target="tiếng Anh") câu dịch
+    đúng tất nhiên không có dấu tiếng Việt, check này sẽ từ chối OAN mọi câu, gây retry/bisect
+    vô tận. Chỉ còn dựa vào tín hiệu CJK (thật sự quan trọng, đúng cho mọi ngôn ngữ đích)."""
     if not translated:
         return True
     if len(CJK_RE.findall(translated)) / len(translated) > 0.3:
         return True
     if LAUGHTER_RE.match(translated):
         return False
-    if len(translated) >= MIN_LEN_FOR_DIACRITIC_CHECK and not VIET_DIACRITIC_RE.search(translated):
+    if _is_vietnamese_target(target_lang) and len(translated) >= MIN_LEN_FOR_DIACRITIC_CHECK \
+            and not VIET_DIACRITIC_RE.search(translated):
         return True
     return False
 
@@ -627,7 +697,7 @@ def translate_with_fallback(
         still_bad = []
         for local_i, global_i in enumerate(pending_idx):
             t = candidate[local_i]
-            if text_looks_untranslated(t):
+            if text_looks_untranslated(t, target_lang):
                 still_bad.append(global_i)
                 q.log_event({"pipeline_id": pipeline_id, "video_name": video_name,
                              "event": "translate_rejected", "label": label, "attempt": attempt,
@@ -650,18 +720,22 @@ def translate_with_fallback(
     if len(pending_idx) == 1:
         i = pending_idx[0]
 
-        polished = _try_google_polish_fallback(base_url, api_key, model, texts[i], context,
-                                                label, pipeline_id, video_name, usage)
-        if polished:
-            result[i] = polished
-            return result  # type: ignore[return-value]
+        # Google Translate rescue chỉ dịch được sang tiếng Việt (_google_translate_zh_vi ép cứng
+        # tl=vi) — target khác (nhánh sách target="tiếng Anh") bỏ qua bước này, rơi thẳng xuống
+        # fallback deepseek-reasoner bên dưới (không đụng gì, đã ổn định sẵn cho mọi target_lang).
+        if _is_vietnamese_target(target_lang):
+            polished = _try_google_polish_fallback(base_url, api_key, model, texts[i], context,
+                                                    label, pipeline_id, video_name, usage)
+            if polished:
+                result[i] = polished
+                return result  # type: ignore[return-value]
 
         try:
             fallback_candidate = call_deepseek(base_url, api_key, FALLBACK_MODEL, [texts[i]],
                                                 [durations[i]], target_lang, 0.3, context, usage)[0]
         except RuntimeError:
             fallback_candidate = None
-        if fallback_candidate and not text_looks_untranslated(fallback_candidate):
+        if fallback_candidate and not text_looks_untranslated(fallback_candidate, target_lang):
             q.log_event({"pipeline_id": pipeline_id, "video_name": video_name,
                          "event": "translate_fallback_model_rescued", "label": label,
                          "text_original": texts[i][:300], "text": fallback_candidate[:300]})
@@ -715,7 +789,7 @@ def _review_chunk(
     for s in target_segs:
         lines.append(f"id={s['id']}: g\u1ed1c=\"{s['text_original']}\" | d\u1ecbch=\"{s['text']}\"")
     user_content = "\n".join(lines)
-    system_content = REVIEW_SYSTEM_PROMPT
+    system_content = REVIEW_SYSTEM_PROMPT.format(target_lang=target_lang)
     if video_context:
         system_content += f"\n\nAdditional context (reference/use consistent proper nouns, do not invent): {video_context}"
     system_content += f" Target language: {target_lang}."
@@ -769,7 +843,7 @@ def review_translation_context(
             new_text = revisions.get(seg["id"])
             if not new_text or new_text == seg["text"]:
                 continue
-            if text_looks_untranslated(new_text):
+            if text_looks_untranslated(new_text, target_lang):
                 print(f"C\u1ea3nh b\u00e1o: review \u0111\u1ec1 xu\u1ea5t s\u1eeda segment id={seg['id']} nh\u01b0ng c\u00e2u m\u1edbi c\u00f3 v\u1ebb "
                       f"ch\u01b0a d\u1ecbch/d\u1ecbch h\u1ecfng \u2014 b\u1ecf qua, gi\u1eef nguy\u00ean b\u1ea3n d\u1ecbch c\u0169: {new_text[:80]!r}",
                       file=sys.stderr)
@@ -781,6 +855,84 @@ def review_translation_context(
                          "event": "translate_reviewed", "segment_id": seg["id"],
                          "before": seg["text"], "after": new_text})
             seg["text"] = new_text
+
+
+def _tag_speaker_chunk(
+    base_url: str, api_key: str, model: str,
+    context_segs: list[dict], target_segs: list[dict], video_context: str = "",
+    usage: "UsageTracker | None" = None,
+) -> dict[int, str]:
+    """1 l\u01b0\u1ee3t g\u00e1n vai: g\u1eedi context_segs (ch\u1ec9 tham kh\u1ea3o) + target_segs (c\u1ea7n g\u00e1n) cho model, nh\u1eadn
+    v\u1ec1 JSON {id: speaker}. B\u1ea5t k\u1ef3 l\u1ed7i API/JSON h\u1ecfng n\u00e0o \u0111\u1ec1u b\u1ecb nu\u1ed1t t\u1ea1i \u0111\u00e2y (tr\u1ea3 {} r\u1ed7ng) \u2014 l\u1ed7i \u1edf
+    l\u01b0\u1ee3t g\u00e1n vai kh\u00f4ng \u0111\u01b0\u1ee3c ph\u00e9p l\u00e0m h\u1ecfng job d\u1ecbch ch\u00ednh \u0111\u00e3 ch\u1ea1y th\u00e0nh c\u00f4ng tr\u01b0\u1edbc \u0111\u00f3; segment
+    kh\u00f4ng g\u00e1n \u0111\u01b0\u1ee3c gi\u1eef nguy\u00ean 'narrator' m\u1eb7c \u0111\u1ecbnh (xem tag_speakers())."""
+    lines = []
+    for s in context_segs:
+        lines.append(f"[CONTEXT \u2014 CH\u1ec8 THAM KH\u1ea2O] id={s['id']}: \"{s['text']}\"")
+    for s in target_segs:
+        lines.append(f"id={s['id']}: \"{s['text']}\"")
+    user_content = "\n".join(lines)
+    system_content = SPEAKER_TAG_SYSTEM_PROMPT
+    if video_context:
+        system_content += f"\n\nName glossary / context (reuse names exactly, do not invent): {video_context}"
+
+    try:
+        content = _post_chat(base_url, api_key, model, system_content, user_content, 0.2, usage)
+        parsed = json.loads(content)
+        speakers = parsed.get("speakers")
+        if not isinstance(speakers, dict):
+            return {}
+    except (RuntimeError, json.JSONDecodeError):
+        print("C\u1ea3nh b\u00e1o: g\u00e1n vai (speaker tagging) th\u1ea5t b\u1ea1i \u2014 b\u1ecf qua chunk n\u00e0y, gi\u1eef 'narrator' m\u1eb7c \u0111\u1ecbnh", file=sys.stderr)
+        return {}
+
+    valid_ids = {s["id"] for s in target_segs}
+    out: dict[int, str] = {}
+    for k, v in speakers.items():
+        try:
+            seg_id = int(k)
+        except (TypeError, ValueError):
+            continue
+        if seg_id in valid_ids and isinstance(v, str) and v.strip():
+            out[seg_id] = v.strip()
+    return out
+
+
+def tag_speakers(
+    base_url: str, api_key: str, model: str, segments: list[dict],
+    video_context: str = "", pipeline_id: str | None = None, video_name: str | None = None,
+    usage: "UsageTracker | None" = None,
+) -> None:
+    """G\u00e1n `seg['speaker']` ('narrator' ho\u1eb7c t\u00ean nh\u00e2n v\u1eadt) cho T\u1eeaNG segment \u2014 ch\u1ec9 d\u00f9ng cho nh\u00e1nh
+    s\u00e1ch (mode='book', xem reup-orchestrator-node), KH\u00d4NG g\u1ecdi cho nh\u00e1nh video (review/dialogue/
+    subtitle gi\u1eef nguy\u00ean h\u00e0nh vi c\u0169, kh\u00f4ng c\u00f3 field 'speaker'). reup-orchestrator-node d\u00f9ng field
+    n\u00e0y \u0111\u1ec3 build map speaker->voice (m\u1ed7i nh\u00e2n v\u1eadt 1 gi\u1ecdng TTS ri\u00eang, ng\u01b0\u1eddi d\u1eabn chuy\u1ec7n 1 gi\u1ecdng
+    ri\u00eang) tr\u01b0\u1edbc khi g\u1ecdi reup-tts-gpu-node tu\u1ea7n t\u1ef1 t\u1eebng segment.
+
+    C\u00f9ng c\u01a1 ch\u1ebf chunk/overlap v\u1edbi review_translation_context() \u2014 1 nh\u00e2n v\u1eadt xu\u1ea5t hi\u1ec7n xuy\u00ean su\u1ed1t
+    s\u00e1ch c\u1ea7n \u0111\u01b0\u1ee3c g\u1ecdi \u0110\u00daNG 1 t\u00ean nh\u1ea5t qu\u00e1n qua nhi\u1ec1u chunk, gi\u1ed1ng l\u00fd do glossary t\u00ean ri\u00eang
+    (extract_name_glossary) t\u1ed3n t\u1ea1i; `video_context` truy\u1ec1n v\u00e0o \u0111\u00e2y n\u00ean l\u00e0 `translate_context` \u0111\u00e3
+    c\u00f3 s\u1eb5n b\u1ea3ng t\u00ean ri\u00eang, kh\u00f4ng ph\u1ea3i m\u00f4 t\u1ea3 t\u00f3m t\u1eaft ri\u00eang.
+
+    M\u1eb7c \u0111\u1ecbnh M\u1eccI segment l\u00e0 'narrator' tr\u01b0\u1edbc khi g\u1ecdi model \u2014 l\u1ed7i \u1edf b\u1ea5t k\u1ef3 chunk n\u00e0o (API l\u1ed7i,
+    JSON h\u1ecfng) ch\u1ec9 khi\u1ebfn c\u00e1c segment trong chunk \u0111\u00f3 gi\u1eef nguy\u00ean 'narrator', kh\u00f4ng l\u00e0m h\u1ecfng job
+    d\u1ecbch ch\u00ednh, kh\u00f4ng bao gi\u1edd \u0111\u1ec3 field 'speaker' thi\u1ebfu (tr\u00e1nh KeyError ph\u00eda orchestrator khi build
+    map gi\u1ecdng)."""
+    for seg in segments:
+        seg.setdefault("speaker", "narrator")
+    for start in range(0, len(segments), REVIEW_CHUNK_SIZE):
+        target_segs = segments[start:start + REVIEW_CHUNK_SIZE]
+        ctx_start = max(0, start - REVIEW_CONTEXT_OVERLAP)
+        context_segs = segments[ctx_start:start]
+        speakers = _tag_speaker_chunk(base_url, api_key, model, context_segs, target_segs, video_context, usage)
+        for seg in target_segs:
+            speaker = speakers.get(seg["id"])
+            if speaker:
+                seg["speaker"] = speaker
+        q.log_event({
+            "pipeline_id": pipeline_id, "video_name": video_name, "event": "translate_speakers_tagged",
+            "chunk_start": start, "speakers": {s["id"]: s["speaker"] for s in target_segs},
+        })
 
 
 # K\u00fd t\u1ef1 k\u1ebft c\u00e2u ti\u1ebfng Trung \u2014 KH\u00c1C SENTENCE_SPLIT_RE b\u00ean d\u01b0\u1edbi (c\u00e1i \u0111\u00f3 t\u00e1ch c\u00e2u b\u1ea3n d\u1ecbch ti\u1ebfng
@@ -951,6 +1103,7 @@ def run_translate(
     batch_size: int = 20,
     pipeline_id: str | None = None,
     video_name: str | None = None,
+    tag_speakers_enabled: bool = False,
 ) -> dict:
     """Dịch 1 file transcript JSON -> file JSON tiếng Việt, trả dict kết quả (đúng
     contract JSON mà CLI vẫn in ra stdout). Tách riêng khỏi main()/argparse để dùng chung
@@ -966,20 +1119,34 @@ def run_translate(
 
     # Gộp segment VAD cắt cụt giữa câu với segment kế tiếp TRƯỚC khi dịch — xem docstring
     # merge_dangling_sentence_segments() cho root cause đầy đủ (bug thật: job fb3c208b, thoại+sub
-    # bị lặp phút đầu do Deepseek "mượn" nội dung segment sau khi gặp câu cụt).
-    segments_before_merge = len(segments)
-    segments = merge_dangling_sentence_segments(segments)
-    if len(segments) < segments_before_merge:
-        q.log_event({"pipeline_id": pipeline_id, "video_name": video_name,
-                     "event": "translate_merged_dangling_segments",
-                     "before_count": segments_before_merge, "after_count": len(segments)})
+    # bị lặp phút đầu do Deepseek "mượn" nội dung segment sau khi gặp câu cụt). CHỈ áp dụng
+    # transcript từ VAD audio thật (nhánh video) — BỎ QUA cho nhánh sách (tag_speakers_enabled,
+    # xem ocr-node/document_extractor.py): segment ở đó là đoạn văn OCR/markitdown đã trọn vẹn,
+    # không có khái niệm "bị cắt ngang giữa câu" như VAD; start/end chỉ là timestamp GIẢ (ước
+    # lượng tốc độ đọc) — heuristic dựa vào duration (>=18.5s) sẽ GỘP NHẦM 2 đoạn văn không liên
+    # quan chỉ vì đoạn trước dài hơn ~259 ký tự, làm lệch cả gán speaker chạy sau bước này.
+    if not tag_speakers_enabled:
+        segments_before_merge = len(segments)
+        segments = merge_dangling_sentence_segments(segments)
+        if len(segments) < segments_before_merge:
+            q.log_event({"pipeline_id": pipeline_id, "video_name": video_name,
+                         "event": "translate_merged_dangling_segments",
+                         "before_count": segments_before_merge, "after_count": len(segments)})
 
     output_p = Path(output_path).resolve()
     output_p.parent.mkdir(parents=True, exist_ok=True)
 
     start = time.time()
     usage = UsageTracker()  # 1 tracker MỚI mỗi lần chạy job — xem docstring UsageTracker
+    translate_context = ""
 
+    # Rollback 2026-08-04 (đã thử "translate_enabled=False khi ocr_lang==target_lang" cho nhánh
+    # sách để khỏi tốn token dịch vi->vi — gây bug thật: text OCR tiếng Việt thường thiếu dấu,
+    # bỏ qua Deepseek verify thì TTS đọc thẳng bản không dấu đó). LUÔN chạy qua Deepseek — kể cả
+    # cùng ngôn ngữ, Deepseek vẫn có tác dụng chuẩn hoá dấu/câu chữ (đã verify thật: OCR
+    # "Chao mung ban den voi sach dien tu." -> Deepseek trả đúng dấu "Chào mừng bạn đến với sách
+    # điện tử.").
+    #
     # Tóm tắt bối cảnh cả video 1 lần TRƯỚC khi dịch batch nào — dùng chung cho mọi batch +
     # review bên dưới (xem summarize_video_context docstring lý do: batch tách rời không biết
     # video nói về gì, dễ dịch sai/bịa nghĩa câu ngắn mơ hồ). Lỗi ở đây không làm hỏng job dịch.
@@ -1044,6 +1211,30 @@ def run_translate(
     review_translation_context(base_url, api_key, model, segments, target_lang, translate_context,
                                 pipeline_id=pipeline_id, video_name=video_name, usage=usage)
 
+    # Gán vai (narrator/tên nhân vật) cho nhánh sách (mode="book") — CHỈ bật khi orchestrator
+    # yêu cầu (worker.py truyền tag_speakers_enabled=True cho payload mode="book"), không đổi
+    # gì hành vi nhánh video review/dialogue/subtitle (segments không có field 'speaker').
+    # translate_context (đã có sẵn bảng tên riêng qua extract_name_glossary) dùng làm ngữ cảnh
+    # để model dùng ĐÚNG 1 tên nhất quán cho mỗi nhân vật xuyên suốt sách.
+    #
+    # Tách theo câu TRƯỚC khi gán vai (bug thật gặp lúc test truyện có thoại: ocr-node gộp cả
+    # đoạn lời dẫn + nhiều lượt thoại thành 1 "segment" thô vì trang PDF không có blank-line rõ
+    # giữa các dòng, xem ocr-node/document_extractor.py::_split_paragraphs — tag_speakers() chạy
+    # trên nguyên khối đó chỉ gán được ĐÚNG 1 speaker cho cả đoạn lẫn lộn, không tách được câu
+    # nào của narrator/câu nào là thoại nhân vật). Gọi split_segment_by_sentences() ở ĐÂY, sớm
+    # hơn bước expand cuối hàm — bước expand cuối gọi lại hàm này lần 2 nhưng đã là no-op (mỗi
+    # segment lúc đó đã đúng 1 câu, `split_sentences()` trả sớm), không tạo trùng lặp gì.
+    if tag_speakers_enabled:
+        expanded_for_tagging: list[dict] = []
+        for seg in segments:
+            expanded_for_tagging.extend(split_segment_by_sentences(seg))
+        for new_id, seg in enumerate(expanded_for_tagging, start=1):
+            seg["id"] = new_id
+        segments = expanded_for_tagging
+
+        tag_speakers(base_url, api_key, model, segments, translate_context,
+                     pipeline_id=pipeline_id, video_name=video_name, usage=usage)
+
     # Mô tả video xuất ra output — tóm tắt lại từ bản ĐÃ DỊCH (tiếng Việt), sau khi review xong
     # (segments["text"] lúc này là bản dịch cuối cùng, đã qua rà soát ngữ cảnh).
     video_context = describe_translated_video(base_url, api_key, model, segments, usage)
@@ -1094,6 +1285,7 @@ def main() -> int:
         result = run_translate(
             str(args.input), str(args.output), args.api_key, args.model,
             args.base_url, args.target_lang, args.batch_size,
+            tag_speakers_enabled=args.tag_speakers,
         )
     except RuntimeError as e:
         print(f"Lỗi: {e}", file=sys.stderr)

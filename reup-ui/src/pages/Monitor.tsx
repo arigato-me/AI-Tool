@@ -23,17 +23,30 @@ const NODE_LABELS: Record<string, string> = {
   translate: "Translate",
   "tts-gpu": "TTS GPU (giọng đọc)",
   editor: "Editor (ffmpeg)",
+  ocr: "OCR (trích văn bản)",
 };
 
 const STAGE_LABELS: Record<string, string> = {
   ytdlp: "Tải video (yt-dlp)",
   transcribe: "Nhận dạng giọng nói",
+  ocr: "Trích văn bản (OCR)",
   translate: "Dịch",
   tts: "Tổng hợp giọng đọc",
   editor_srt: "Tạo phụ đề",
   editor_mix_dialogue: "Trộn nền",
   editor_edit: "Ghép video",
 };
+
+// mode="book" gọi tts tuần tự TỪNG segment (`tts_seg_0001`, `tts_seg_0002`, ...) thay vì 1 bước
+// "tts" duy nhất — không liệt kê hết trong STAGE_LABELS (số lượng tuỳ sách), rút gọn hiển thị
+// về "Đọc giọng (đoạn N)" bằng regex thay vì tên kỹ thuật thô.
+const TTS_SEG_STAGE_RE = /^tts_seg_(\d+)$/;
+
+function formatStageName(name: string): string {
+  const segMatch = name.match(TTS_SEG_STAGE_RE);
+  if (segMatch) return `Đọc giọng (đoạn ${parseInt(segMatch[1], 10)})`;
+  return STAGE_LABELS[name] ?? name;
+}
 
 const STATUS_FILTERS = ["all", "pending", "started", "finished", "failed", "cancelled"] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
@@ -67,12 +80,12 @@ function stageLabel(job: PipelineJob): string {
   if (job.status === "pending") return "Đang chờ";
   if (job.status === "failed" || job.status === "cancelled") {
     const stage = job.current_stage;
-    return stage ? STAGE_LABELS[stage] ?? stage : "Không rõ bước";
+    return stage ? formatStageName(stage) : "Không rõ bước";
   }
   if (job.status !== "started") return "-";
   const stage = job.current_stage;
   if (!stage) return "Đang chờ";
-  return STAGE_LABELS[stage] ?? stage;
+  return formatStageName(stage);
 }
 
 /** Tên video hiển thị kèm tag nhánh (review_/dialogue_) — khớp công thức `export_stem` sinh
