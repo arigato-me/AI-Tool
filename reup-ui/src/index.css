@@ -919,6 +919,115 @@ video {
   font-size: var(--text-sm);
 }
 
+/* mode="mix" (SubmitJob.tsx MixItemRow) — danh sách video/audio nguồn nối tiếp. Mỗi dòng là 1
+   hàng flex align-items:center (KHÔNG dùng .row grid + align-items:end như bản đầu — cách đó
+   cần đệm ẩn giả chiều cao label mới canh đúng, dễ sai vì 2 khoảng cách margin dễ nhầm nhau;
+   flex+center đơn giản và chắc chắn hơn, cùng pattern .list-row đã dùng ở MusicLibrary.tsx).
+   Bỏ nhãn "Loại nguồn"/"URL" lặp lại mỗi dòng (rối mắt khi có nhiều dòng) — thay bằng aria-label
+   trên từng field, số thứ tự (mix-item-index) thay lời nhắc "đây là dòng số mấy, nối theo thứ
+   tự này". */
+.mix-lists {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.mix-item-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-input);
+  padding: var(--space-2xs);
+  margin-top: var(--space-2xs);
+}
+
+.mix-item-row:focus-within {
+  border-color: var(--color-accent);
+}
+
+.mix-item-index {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-info-bg);
+  color: var(--color-ink-2);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.mix-item-row .dropdown.mix-item-type {
+  flex: 0 0 11rem;
+}
+
+.mix-item-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.mix-item-field input {
+  margin-top: 0;
+}
+
+.mix-item-library,
+.mix-item-image {
+  display: flex;
+  gap: var(--space-2xs);
+}
+
+.mix-item-library .dropdown {
+  flex: 1;
+  min-width: 0;
+}
+
+.mix-item-image input[type="number"] {
+  flex: 0 0 12rem;
+}
+
+.mix-item-add {
+  width: 100%;
+  margin-top: var(--space-2xs);
+  padding: var(--space-xs);
+  background: transparent;
+  border: 1px dashed var(--color-rule);
+  border-radius: var(--radius-input);
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+}
+
+.mix-item-add:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+@media (max-width: 40rem) {
+  .mix-item-row {
+    flex-wrap: wrap;
+  }
+
+  .mix-item-row .dropdown.mix-item-type {
+    flex: 1 1 auto;
+  }
+
+  .mix-item-field {
+    flex-basis: 100%;
+  }
+
+  .mix-item-library,
+  .mix-item-image {
+    flex-direction: column;
+  }
+
+  .mix-item-image input[type="number"] {
+    flex: none;
+  }
+}
+
 .btn-icon-danger {
   display: inline-flex;
   align-items: center;
@@ -1052,6 +1161,27 @@ video {
 @media (prefers-reduced-motion: reduce) {
   .field-info-popup {
     transition: none;
+  }
+}
+
+/* Mobile — `.field-info-popup` neo tuyệt đối theo mép trái nút "i" (`left:0`, rộng tới
+   `max-width:18rem`). Nút "i" càng xa lề trái (label dài, vd "Video nguồn (nối tiếp theo thứ
+   tự)") thì popup càng tràn hẳn ra ngoài viewport bên phải, chữ bị cắt không đọc được — bug
+   thật gặp trên điện thoại. Cùng breakpoint 40rem/pointer:coarse đã dùng cho mọi layout mobile
+   khác trong file này (khớp `design.md` "Bảng dữ liệu... đổi thành dạng thẻ dưới 640px"): thay
+   vì neo theo toạ độ nút "i" (không tính được bằng CSS thuần, không phụ thuộc JS đo vị trí
+   trigger như Dropdown.tsx đang làm), popup chuyển hẳn sang `position:fixed` neo theo 2 mép
+   trái/phải VIEWPORT — độc lập hoàn toàn với nút "i" nằm ở đâu trên màn hình, không thể tràn. */
+@media (max-width: 40rem), (pointer: coarse) {
+  .field-info-popup {
+    position: fixed;
+    left: var(--space-md);
+    right: var(--space-md);
+    bottom: var(--space-md);
+    top: auto;
+    width: auto;
+    max-width: none;
+    z-index: 25;
   }
 }
 

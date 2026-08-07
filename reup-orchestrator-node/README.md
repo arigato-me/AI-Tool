@@ -71,6 +71,52 @@ audio gốc, không cần thêm nhạc ngoài). Thứ tự ưu tiên khi gửi n
 `reup-editor-node/data/music`). Có field nhạc nào thì thêm 1 bước `editor_mix_music` vào
 `result.stages`, không gửi field nào thì bỏ qua bước này (giữ hành vi cũ).
 
+**`mode="mix"`** — ghép N video nối tiếp + N audio nối tiếp thành 1 video final, KHÔNG
+transcribe/dịch/TTS/sub gì cả (khác hẳn review/dialogue/subtitle). Không dùng `url` đơn — dùng
+`video_items`/`audio_items` (list, bắt buộc ≥1 mỗi bên):
+
+```bash
+curl -s -X POST http://localhost:8106/pipelines -H 'Content-Type: application/json' -d '{
+  "mode": "mix",
+  "video_name": "demo",
+  "video_items": [
+    {"type": "url", "url": "https://www.douyin.com/video/..."},
+    {"type": "reuse", "pipeline_id": "8f2a1c...cũ đã tải"}
+  ],
+  "audio_items": [
+    {"type": "library", "music_project": "chill", "music_track": "lofi-1.mp3"}
+  ]
+}'
+```
+
+Mỗi item trong `video_items`/`audio_items` là 1 object `{"type": ...}`:
+
+| type | field kèm theo | Ý nghĩa | Áp dụng |
+|---|---|---|---|
+| `url` | `url` | Tải qua yt-dlp (Douyin/YouTube/TikTok/FB...) — audio item kiểu này tự thêm `-x --audio-format mp3` lúc tải (ffmpeg tự tách audio) | video + audio |
+| `upload` | `data_b64`, `ext` | Upload tay 1 file base64 | video + audio |
+| `reuse` | `pipeline_id` | Tái dùng file đã tải của 1 pipeline cũ (file còn nằm ở `reup-ytdlp-node/data/downloads`, KHÔNG tạo job ytdlp mới, không tải lại) | video + audio |
+| `library` | `music_project`, `music_track` | Track có sẵn trong thư viện nhạc nền (xem mục "Thư viện nhạc nền" dưới) | chỉ audio |
+| `image` | `data_b64`, `ext`, `duration` (giây, xem dưới) | Ảnh tĩnh -> 1 clip video giữ nguyên ảnh (xem `reup-editor-node/README.md` cmd `image-to-video`) | chỉ video |
+
+`duration` (item `type="image"`): bắt buộc nếu `video_items` TRỘN ảnh với video thật khác. Nếu
+`video_items` TOÀN BỘ là ảnh, `duration` tuỳ chọn — bỏ trống thì item đó tự chia đều PHẦN audio
+còn lại (sau khi trừ các ảnh đã tự nhập `duration`) cho các ảnh còn thiếu (vd audio 10s, 2 ảnh
+không nhập `duration` -> mỗi ảnh 5s; 1 ảnh nhập `duration: 4` + 1 ảnh không nhập -> ảnh còn lại
+tự lấy 6s).
+
+Xử lý: video nhiều item khác resolution/fps/codec (khác nền tảng) LUÔN được chuẩn hoá (scale/pad
++ fps theo video ĐẦU TIÊN) trước khi nối — tránh lỗi ffmpeg `concat` khi nguồn không đồng nhất
+(xem `reup-editor-node/README.md` cmd `concat-video`). Video và audio sau khi nối riêng được mux
+lại bằng đúng cơ chế `-shortest` sẵn có (cmd `edit`) — **track nào ngắn hơn (tổng video hay tổng
+audio) quyết định độ dài video xuất cuối**, không cắt/pad thêm gì khác. Output:
+`/outputs/<pipeline_id>/mix_<tên>.mp4` (hoặc `mix_final.mp4` nếu không đặt `video_name`). Xem
+`reup-orchestrator-node/scripts/pipeline_runner.py::_run_mix_pipeline`/`_resolve_mix_item`.
+
+**Lưu ý thứ tự xử lý**: `audio_items` được resolve + nối (`concat-audio`) TRƯỚC `video_items` —
+cần biết tổng độ dài audio trước để tính mặc định `duration` cho ảnh (nếu có). Không ảnh hưởng
+kết quả cuối khi không có ảnh, chỉ đổi thứ tự 2 bước độc lập dữ liệu.
+
 ### `POST /pipelines/{id}/cancel` — huỷ job
 
 ```bash
@@ -107,7 +153,7 @@ bước tốn thời gian/băng thông nhất khi phải chờ vô ích); mở r
 pattern đã dùng ở `ytdlp` — cancel ở 4 node đó vẫn là **best-effort ở tầng orchestrator**, không
 phải kill tiến trình thật.
 
-### `POST /pipelines/{id}/trim` — cắt đầu/đuôi mp3 (chỉ nhánh `mode="audio"`)
+### `POST /pipelines/{id}/trim` — cắt đầu/đuôi mp3/video
 
 ```bash
 curl -s -X POST http://localhost:8106/pipelines/<pipeline_id>/trim \
@@ -116,14 +162,18 @@ curl -s -X POST http://localhost:8106/pipelines/<pipeline_id>/trim \
 ```
 
 `start`/`end` (giây hoặc `"HH:MM:SS"`) — truyền 1 trong 2 để chỉ cắt đầu HOẶC chỉ cắt đuôi,
-truyền cả 2 để cắt cả 2 đầu. Chỉ dùng được khi job đã `finished` VÀ `mode="audio"` (từ chối nếu
-job thuộc nhánh review/dialogue/subtitle — mp4 không có tính chất "mọi frame đều cắt được không
-lệch" như mp3, xem `trim_lib.py`). Chạy ffmpeg **`-c copy` (stream copy, không re-encode)** trực
-tiếp trong container `api` — không qua job queue của `worker` vì đây là thao tác cục bộ, nhanh
-(vài giây với file vài chục MB), không phải gọi HTTP sang node khác. Ghi file
-`<tên>_trimmed.mp3` cạnh file gốc (không đụng/xoá file gốc) — gọi lại nhiều lần (thử start/end
-khác) chỉ ghi đè đúng file `_trimmed.mp3` này, xem lại được cả file gốc lẫn bản đã cắt bất kỳ
-lúc nào qua `GET /pipelines/{id}` (field `trim_output`).
+truyền cả 2 để cắt cả 2 đầu. Chỉ dùng được khi job đã `finished`. Định theo **đuôi file output**,
+không theo `mode`: mp4/webm/mkv (review/dialogue/subtitle/video/mix) đều cắt được; mp3 GIỮ
+NGUYÊN gate cũ — chỉ `mode="audio"` (mp3 của mode khác, vd `book`, cố tình KHÔNG cho cắt ở đây,
+ngoài phạm vi). Chạy ffmpeg **`-c copy` (stream copy, không re-encode)** trực tiếp trong container
+`api` — không qua job queue của `worker`, tức thời, 0 tốn CPU thêm/không ảnh hưởng service khác.
+mp3 cắt chính xác tuyệt đối tại mọi mốc thời gian (không có keyframe/GOP); **video (mp4/webm/mkv)
+chỉ cắt được tại keyframe gần nhất** — điểm cắt thực tế có thể lệch vài giây so với `start`/`end`
+yêu cầu tuỳ khoảng cách keyframe của video gốc, KHÔNG frame-chính-xác tuyệt đối (đánh đổi đã chốt:
+chấp nhận lệch để đổi lấy tốc độ/an toàn — cắt frame-chính-xác cần re-encode, tốn CPU đáng kể,
+xem `trim_lib.py`). Ghi file `<tên>_trimmed<đuôi gốc>` cạnh file gốc (không đụng/xoá file gốc) —
+gọi lại nhiều lần (thử start/end khác) chỉ ghi đè đúng file `_trimmed` này, xem lại được cả file
+gốc lẫn bản đã cắt bất kỳ lúc nào qua `GET /pipelines/{id}` (field `trim_output`).
 
 ### `GET /pipelines/{id}` — poll trạng thái
 

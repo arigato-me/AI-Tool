@@ -32,6 +32,7 @@ docker_build/
 ├── reup-editor-node/       # final mux/edit stage — ffmpeg (edit/srt/mix-dialogue/mix-music)
 ├── reup-orchestrator-node/ # sequences the 5 nodes above into full pipeline runs (POST /pipelines)
 ├── ocr-node/               # extract stage for the "Book → Audio" branch — pdf/docx/pptx/xlsx/image -> transcript JSON
+├── reup-notify-node/       # send pipeline results via Telegram/WhatsApp/Zalo/Messenger/webhook — standalone, not yet wired into orchestrator
 ├── reup-ui/                # operator web UI (React/Vite + nginx), talks to the orchestrator
 ├── repo_github/
 │   ├── yt-dlp/              # vendored yt-dlp source, patched for Douyin support
@@ -81,8 +82,8 @@ docker compose down
 
 Ports: `reup-translate-node` 8101, `reup-ytdlp-node` 8102, `reup-editor-node` 8103,
 `reup-transcribe-node` 8104, `reup-tts-gpu-node` 8105, `reup-orchestrator-node` 8106,
-`reup-ui` 8107, `ocr-node` 8108 (`reup-broker`'s Redis has no host-exposed port, only reachable
-on the internal `reup-net` network).
+`reup-ui` 8107, `ocr-node` 8108, `reup-notify-node` 8109 (`reup-broker`'s Redis has no
+host-exposed port, only reachable on the internal `reup-net` network).
 
 Every node's own README documents its exact `POST /jobs` body shape and any node-specific
 behavior — read that first rather than assuming a shared contract beyond `POST /jobs` +
@@ -252,6 +253,25 @@ clone chỉ cho 1 giọng, không hợp round-robin nhiều nhân vật. Xem `oc
 `reup-orchestrator-node/README.md` mục "Sách → Audio" cho chi tiết đầy đủ + các đơn giản hoá đã
 chấp nhận ở bản đầu (chưa streaming per-page cho pdf hàng nghìn trang, chưa OOM-guard/CUDA-retry,
 audit-trail per-trang riêng).
+
+**Nhánh mix** (`mode=mix` ở `POST /pipelines` — ghép N video nối tiếp + N audio nối tiếp thành 1
+video final, KHÔNG transcribe/dịch/TTS/sub gì cả, khác hẳn review/dialogue/subtitle/book). Dùng
+`video_items`/`audio_items` (list, mỗi item `type="url"` tải qua yt-dlp | `"upload"` file base64
+| `"reuse"` tái dùng file đã tải của 1 `pipeline_id` cũ, không tải lại | `"library"`, chỉ audio,
+track từ thư viện nhạc nền | `"image"`, chỉ video, ảnh tĩnh -> clip video giữ nguyên ảnh trong
+`duration` giây — bắt buộc nếu trộn ảnh với video thật, bỏ trống thì tự chia đều theo tổng độ dài
+audio nếu `video_items` toàn ảnh). Video khác resolution/fps/codec (khác nền tảng) LUÔN được
+chuẩn hoá theo video đầu tiên trước khi nối; video+audio sau khi nối riêng được mux bằng đúng cơ
+chế `-shortest` sẵn có — track ngắn hơn quyết định độ dài final. Xem
+`reup-orchestrator-node/README.md` mục "Nhánh mix" và
+`reup-orchestrator-node/scripts/pipeline_runner.py::_run_mix_pipeline`.
+
+**Cắt đầu/đuôi output** (`POST /pipelines/{id}/trim`) — mp3 (`mode="audio"`, không đổi) và giờ cả
+video (mp4/webm/mkv — review/dialogue/subtitle/video/mix) đều cắt được, định theo đuôi file
+output chứ không theo `mode`. Luôn `-c copy` (stream copy, tức thời, không tốn CPU) — video cắt
+tại keyframe gần nhất nên điểm cắt thực tế có thể lệch vài giây, không frame-chính-xác (đánh đổi
+chủ ý để không ảnh hưởng service khác). Xem `reup-orchestrator-node/README.md` mục
+"`POST /pipelines/{id}/trim`" và `reup-orchestrator-node/scripts/trim_lib.py`.
 
 **Quy ước tag image theo version**: `:local` bị ghi đè mỗi lần `docker compose build`, không có
 đường lùi. Trước khi build đè 1 image dự định giữ lại lâu dài, tag thêm bản cụ thể trước:

@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 import queue_lib as q
 from node_client import NodeJobError, submit_and_wait
-from trim_lib import TrimError, trim_audio
+from trim_lib import TrimError, trim_media
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://reup-redis:6379/0")
 ROLE = "orchestrator-worker"
@@ -61,6 +61,25 @@ class BookDocument(BaseModel):
     ext: str
 
 
+class MixItem(BaseModel):
+    """1 nguồn video/audio trong mode="mix" — xem pipeline_runner.py::_resolve_mix_item.
+    type="url": tải qua yt-dlp. type="upload": data_b64+ext, giống BookDocument. type="reuse":
+    tái dùng file đã tải sẵn của 1 pipeline_id cũ (không tải lại). type="library": CHỈ hợp lệ
+    trong audio_items — track có sẵn trong thư viện nhạc nền (music_project/music_track).
+    type="image": CHỈ hợp lệ trong video_items — ảnh tĩnh chuyển thành clip video (xem
+    reup-editor-node/scripts/image_to_video_cli.py). `duration` (giây) bắt buộc nếu video_items
+    có TRỘN ảnh với video thật; nếu TOÀN BỘ video_items là ảnh, để trống thì chia đều theo tổng
+    độ dài audio_items (xem _run_mix_pipeline)."""
+    type: str
+    url: str | None = None
+    data_b64: str | None = None
+    ext: str | None = None
+    pipeline_id: str | None = None
+    music_project: str | None = None
+    music_track: str | None = None
+    duration: float | None = None
+
+
 class PipelineRequest(BaseModel):
     # Bắt buộc cho mọi mode TRỪ "book" (nhánh sách dùng `documents` thay vì url — xem validate ở
     # submit_pipeline() bên dưới, Pydantic không ép được ràng buộc "1 trong 2 tuỳ mode" gọn hơn
@@ -101,6 +120,10 @@ class PipelineRequest(BaseModel):
     # 3 cùng gửi. Xem thứ tự ưu tiên đầy đủ ở pipeline_runner.py.
     music_project: str | None = None
     music_track: str | None = None
+    # mode="mix" — ghép nhiều video nối tiếp + nhiều audio nối tiếp, không transcribe/dịch/TTS/
+    # sub. Xem pipeline_runner.py::_run_mix_pipeline.
+    video_items: list[MixItem] = []
+    audio_items: list[MixItem] = []
 
 
 class TrimBody(BaseModel):
@@ -168,13 +191,32 @@ def translate_tokens_stats() -> dict:
 
 @app.post("/pipelines")
 def submit_pipeline(req: PipelineRequest) -> dict:
-    if req.mode not in ("review", "dialogue", "subtitle", "audio", "video", "book"):
+    if req.mode not in ("review", "dialogue", "subtitle", "audio", "video", "book", "mix"):
         return {"ok": False, "error": f"mode không hợp lệ: {req.mode}"}
     if req.mode == "book":
         if not req.documents:
             return {"ok": False, "error": "mode='book' cần documents (ít nhất 1 file)"}
         if req.ocr_lang not in ("vi", "en", "fr"):
             return {"ok": False, "error": f"ocr_lang không hợp lệ: {req.ocr_lang!r} (chỉ nhận 'vi'/'en'/'fr')"}
+    elif req.mode == "mix":
+        if not req.video_items:
+            return {"ok": False, "error": "mode='mix' cần video_items (ít nhất 1)"}
+        if not req.audio_items:
+            return {"ok": False, "error": "mode='mix' cần audio_items (ít nhất 1)"}
+        for i, it in enumerate(req.video_items):
+            if it.type not in ("url", "upload", "reuse", "image"):
+                return {"ok": False, "error": f"video_items[{i}].type không hợp lệ: {it.type!r}"}
+        # type="image" thiếu duration CHỈ hợp lệ khi TOÀN BỘ video_items là ảnh (mặc định chia
+        # đều theo audio lúc chạy, xem _run_mix_pipeline) — trộn ảnh với video thật thì mỗi ảnh
+        # bắt buộc tự nhập duration, không có "audio dùng chung" hợp lý khi có video thật khác.
+        all_images = all(it.type == "image" for it in req.video_items)
+        if not all_images:
+            for i, it in enumerate(req.video_items):
+                if it.type == "image" and not (it.duration and it.duration > 0):
+                    return {"ok": False, "error": f"video_items[{i}] type='image' trộn cùng video thật cần duration (giây) > 0"}
+        for i, it in enumerate(req.audio_items):
+            if it.type not in ("url", "upload", "reuse", "library"):
+                return {"ok": False, "error": f"audio_items[{i}].type không hợp lệ: {it.type!r}"}
     elif not req.url:
         return {"ok": False, "error": "thiếu url"}
     job_id = q.new_job(conn, req.model_dump())
@@ -228,28 +270,36 @@ def cancel_pipeline(pipeline_id: str) -> dict:
 
 @app.post("/pipelines/{pipeline_id}/trim")
 def trim_pipeline_output(pipeline_id: str, req: TrimBody) -> dict:
-    """Cắt đầu/đuôi output mp3 của 1 job đã 'finished' — CHỈ áp dụng `mode="audio"` (xem
-    `trim_lib.py` lý do không mở rộng sang mp4). Chạy ffmpeg trực tiếp tại đây (không qua job
-    queue), ghi file `<tên>_trimmed.mp3` cạnh file gốc — không đụng file gốc, gọi lại nhiều lần
-    (đổi start/end thử) chỉ ghi đè đúng file `_trimmed.mp3`."""
+    """Cắt đầu/đuôi output (mp3 HOẶC video mp4/webm/mkv) của 1 job đã 'finished'. Chạy ffmpeg
+    trực tiếp tại đây (không qua job queue), ghi file `<tên>_trimmed<đuôi gốc>` cạnh file gốc —
+    không đụng file gốc, gọi lại nhiều lần (đổi start/end thử) chỉ ghi đè đúng file `_trimmed`.
+
+    Định theo ĐUÔI FILE output, không theo `mode` — tự đúng cho mọi nhánh xuất video (review/
+    dialogue/subtitle/video/mix, kể cả mode mới thêm sau này) mà không cần liệt kê cứng danh
+    sách mode. Riêng mp3: GIỮ NGUYÊN gate cũ `mode="audio"` — không mở rộng cho mp3 của mode
+    khác (vd mode="book" cũng xuất mp3, cố tình KHÔNG cho trim ở đây, ngoài phạm vi yêu cầu)."""
     job = q.get_job(conn, pipeline_id)
     if job is None:
         return {"ok": False, "error": "pipeline không tồn tại hoặc đã hết hạn (TTL 48h)"}
     if job.get("status") != "finished":
         return {"ok": False, "error": f"chỉ cắt được job đã 'finished' (hiện tại: {job.get('status')})"}
     payload = job.get("payload") or {}
-    if payload.get("mode") != "audio":
-        return {"ok": False, "error": "chỉ hỗ trợ cắt cho job nhánh mode='audio' (mp3)"}
     output = (job.get("result") or {}).get("output")
-    if not output or not str(output).lower().endswith(".mp3"):
-        return {"ok": False, "error": "job này không có output mp3 để cắt"}
+    if not output:
+        return {"ok": False, "error": "job này không có output để cắt"}
+    ext = Path(output).suffix.lower()
+    if ext == ".mp3":
+        if payload.get("mode") != "audio":
+            return {"ok": False, "error": "chỉ hỗ trợ cắt mp3 cho job nhánh mode='audio'"}
+    elif ext not in (".mp4", ".webm", ".mkv"):
+        return {"ok": False, "error": f"định dạng không hỗ trợ cắt: {ext or '(không rõ)'}"}
 
     in_path = Path(output)
     if not in_path.is_file():
         return {"ok": False, "error": f"file không tồn tại trên đĩa: {output}"}
     out_path = in_path.with_name(in_path.stem + "_trimmed" + in_path.suffix)
     try:
-        result = trim_audio(str(in_path), str(out_path), req.start, req.end)
+        result = trim_media(str(in_path), str(out_path), req.start, req.end)
     except TrimError as e:
         return {"ok": False, "error": str(e)}
 

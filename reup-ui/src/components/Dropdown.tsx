@@ -12,11 +12,14 @@ interface DropdownProps {
   onChange: (value: string) => void;
   options: DropdownOption[];
   className?: string;
+  /** Tên đọc cho screen reader khi không có <label> văn bản hiện trước field (vd 1 dòng lặp
+   * trong danh sách — hiện label chữ mỗi dòng gây rối mắt, nhưng vẫn cần tên cho AT). */
+  ariaLabel?: string;
 }
 
 const LIST_MAX_HEIGHT = 256; // == CSS 16rem, giữ 2 nơi khớp nhau
 
-export default function Dropdown({ value, onChange, options, className }: DropdownProps) {
+export default function Dropdown({ value, onChange, options, className, ariaLabel }: DropdownProps) {
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [openUp, setOpenUp] = useState(false);
@@ -92,6 +95,7 @@ export default function Dropdown({ value, onChange, options, className }: Dropdo
         className="dropdown-trigger"
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label={ariaLabel}
         onClick={() => (open ? setOpen(false) : openDropdown())}
         onKeyDown={handleKeyDown}
       >

@@ -25,11 +25,11 @@ ROLE = "editor-worker"
 conn = redis_lib.Redis.from_url(REDIS_URL)
 app = FastAPI()
 
-VALID_CMDS = {"edit", "srt", "mix-dialogue", "mix-music"}
+VALID_CMDS = {"edit", "srt", "mix-dialogue", "mix-music", "concat-video", "concat-audio", "image-to-video"}
 
 
 class EditJobRequest(BaseModel):
-    cmd: str  # "edit" | "srt" | "mix-dialogue"
+    cmd: str  # "edit" | "srt" | "mix-dialogue" | "mix-music" | "concat-video" | "concat-audio" | "image-to-video"
     params: dict
     pipeline_id: str | None = None  # correlation ID cho log — orchestrator truyền vào, không bắt buộc
     video_name: str | None = None

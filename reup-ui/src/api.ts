@@ -114,11 +114,28 @@ export interface BookDocument {
   ext: string;
 }
 
+/** 1 nguồn video/audio trong mode="mix" — xem reup-orchestrator-node/scripts/api.py::MixItem.
+ * type="url": tải qua yt-dlp. type="upload": data_b64+ext. type="reuse": tái dùng file đã tải
+ * của 1 pipeline_id cũ (không tải lại). type="library": CHỈ hợp lệ trong audio_items — track
+ * có sẵn trong thư viện nhạc nền. */
+export interface MixItem {
+  type: "url" | "upload" | "reuse" | "library" | "image";
+  url?: string;
+  data_b64?: string;
+  ext?: string;
+  pipeline_id?: string;
+  music_project?: string;
+  music_track?: string;
+  // type="image" (chỉ video_items) — giây. Bắt buộc nếu trộn ảnh với video thật; để trống nếu
+  // TOÀN BỘ video_items là ảnh (chia đều theo audio, xem pipeline_runner.py::_run_mix_pipeline).
+  duration?: number;
+}
+
 export interface SubmitPipelineBody {
-  // Bắt buộc cho mọi mode TRỪ "book" (nhánh sách dùng documents thay vì url).
+  // Bắt buộc cho mọi mode TRỪ "book"/"mix" (2 nhánh đó không dùng url đơn).
   url?: string;
   video_name?: string;
-  mode: "review" | "dialogue" | "subtitle" | "audio" | "video" | "book";
+  mode: "review" | "dialogue" | "subtitle" | "audio" | "video" | "book" | "mix";
   source_lang?: "zh" | "other";
   voice?: string;
   style?: string;
@@ -142,6 +159,10 @@ export interface SubmitPipelineBody {
   // Ngôn ngữ đọc (dịch sang) — mặc định "tiếng Việt" ở orchestrator nếu không gửi. mode="book"
   // mới cho chọn tay (Tiếng Việt/Tiếng Anh); nhánh video không gửi field này, giữ nguyên default.
   target_lang?: string;
+  // mode="mix" — ghép nhiều video nối tiếp + nhiều audio nối tiếp, không transcribe/dịch/TTS/
+  // sub. Xem reup-orchestrator-node/scripts/pipeline_runner.py::_run_mix_pipeline.
+  video_items?: MixItem[];
+  audio_items?: MixItem[];
 }
 
 export async function submitPipeline(

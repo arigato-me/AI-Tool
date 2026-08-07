@@ -285,52 +285,68 @@ export default function JobDetail({ pipelineId }: { pipelineId: string }) {
         </div>
       )}
 
-      {job && job.status === "finished" && job.payload?.mode === "audio" && job.result?.output && (
-        <div className="card">
-          <p className="stage-detail">
-            Cắt đầu/đuôi (điền ít nhất 1 ô — giây hoặc dạng "HH:MM:SS"):
-          </p>
-          <div className="row">
-            <label>
-              Cắt từ
-              <input
-                value={trimStart}
-                onChange={(e) => setTrimStart(e.target.value)}
-                placeholder="00:00:05"
-              />
-            </label>
-            <label>
-              Cắt đến
-              <input
-                value={trimEnd}
-                onChange={(e) => setTrimEnd(e.target.value)}
-                placeholder="00:01:30"
-              />
-            </label>
+      {job && job.status === "finished" && job.result?.output && (() => {
+        // mp3: chỉ mode="audio" (khớp gate cũ ở backend, KHÔNG mở rộng sang mp3 của mode khác
+        // vd book). Video: mọi nhánh xuất mp4/webm/mkv (review/dialogue/subtitle/video/mix) —
+        // xem reup-orchestrator-node/scripts/api.py::trim_pipeline_output.
+        const outputLower = job.result.output.toLowerCase();
+        const isMp3 = outputLower.endsWith(".mp3");
+        const canTrim = (isMp3 && job.payload?.mode === "audio")
+          || outputLower.endsWith(".mp4") || outputLower.endsWith(".webm") || outputLower.endsWith(".mkv");
+        if (!canTrim) return null;
+        const trimOutputIsAudio = job.trim_output?.toLowerCase().includes(".mp3");
+        return (
+          <div className="card">
+            <p className="stage-detail">
+              Cắt đầu/đuôi (điền ít nhất 1 ô — giây hoặc dạng "HH:MM:SS"). Video cắt theo keyframe
+              gần nhất — điểm cắt thực tế có thể lệch vài giây so với yêu cầu, không frame-chính-xác.
+            </p>
+            <div className="row">
+              <label>
+                Cắt từ
+                <input
+                  value={trimStart}
+                  onChange={(e) => setTrimStart(e.target.value)}
+                  placeholder="00:00:05"
+                />
+              </label>
+              <label>
+                Cắt đến
+                <input
+                  value={trimEnd}
+                  onChange={(e) => setTrimEnd(e.target.value)}
+                  placeholder="00:01:30"
+                />
+              </label>
+            </div>
+            {trimError && <p className="error">{trimError}</p>}
+            <p>
+              <button
+                type="button"
+                disabled={trimming || (!trimStart.trim() && !trimEnd.trim())}
+                onClick={handleTrim}
+              >
+                {trimming ? "Đang cắt..." : "Cắt"}
+              </button>
+            </p>
+            {job.trim_output && (
+              <>
+                <p className="stage-detail">Bản đã cắt:</p>
+                {trimOutputIsAudio ? (
+                  <audio controls src={outputUrl(job.trim_output)} style={{ width: "100%" }} />
+                ) : (
+                  <video controls src={outputUrl(job.trim_output)} style={{ width: "100%" }} />
+                )}
+                <p>
+                  <a href={outputUrl(job.trim_output)} download>
+                    Tải bản đã cắt
+                  </a>
+                </p>
+              </>
+            )}
           </div>
-          {trimError && <p className="error">{trimError}</p>}
-          <p>
-            <button
-              type="button"
-              disabled={trimming || (!trimStart.trim() && !trimEnd.trim())}
-              onClick={handleTrim}
-            >
-              {trimming ? "Đang cắt..." : "Cắt"}
-            </button>
-          </p>
-          {job.trim_output && (
-            <>
-              <p className="stage-detail">Bản đã cắt:</p>
-              <audio controls src={outputUrl(job.trim_output)} style={{ width: "100%" }} />
-              <p>
-                <a href={outputUrl(job.trim_output)} download>
-                  Tải bản đã cắt
-                </a>
-              </p>
-            </>
-          )}
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

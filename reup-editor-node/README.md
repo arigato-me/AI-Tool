@@ -21,7 +21,7 @@ docker compose up -d
 
 ## API
 
-### `POST /jobs` — body `{"cmd": "edit"|"srt"|"mix-dialogue"|"mix-music", "params": {...}}`
+### `POST /jobs` — body `{"cmd": "edit"|"srt"|"mix-dialogue"|"mix-music"|"concat-video"|"concat-audio"|"image-to-video", "params": {...}}`
 
 **`edit`** — params: `video`, `audio`, `output` (bắt buộc), `subtitles`, `subtitle_mode`
 (`none`/`soft`/`burn`), `crf`, `audio_bitrate` (tùy chọn):
@@ -69,7 +69,45 @@ curl -s -X POST http://localhost:8103/jobs -H 'Content-Type: application/json' -
 }'
 ```
 
-Cả 4 subcommand nhận thêm field tuỳ chọn `pipeline_id`/`video_name` (correlation ID cho
+**`concat-video`** — params: `inputs` (list đường dẫn, bắt buộc, ≥1), `output` (bắt buộc), `fps`,
+`crf` (tuỳ chọn). Nối N video nối tiếp — LUÔN chuẩn hoá (scale/pad + fps) theo kích thước/fps
+video ĐẦU TIÊN trước khi `concat` (tránh lỗi khi nguồn khác resolution/fps/codec, vd 1 video dọc
+9:16 nối 1 video ngang 16:9). Dùng cho `mode="mix"` (xem `reup-orchestrator-node/README.md` mục
+"Nhánh mix") — không map audio (bước mux cuối đọc audio từ `concat-audio` riêng):
+
+```bash
+curl -s -X POST http://localhost:8103/jobs -H 'Content-Type: application/json' -d '{
+  "cmd": "concat-video",
+  "params": {"inputs": ["/source/v1.mp4", "/source/v2.mp4"], "output": "/outputs/concat_video.mp4"}
+}'
+```
+
+**`concat-audio`** — params: `inputs` (list đường dẫn, bắt buộc, ≥1), `output` (bắt buộc),
+`sample_rate` (tùy chọn, mặc định 44100). Nối N audio nối tiếp — luôn lấy stream `a:0` của mỗi
+input nên nhận thẳng cả file video (không cần tách `-vn` riêng), dùng cho `mode="mix"`:
+
+```bash
+curl -s -X POST http://localhost:8103/jobs -H 'Content-Type: application/json' -d '{
+  "cmd": "concat-audio",
+  "params": {"inputs": ["/source/a1.mp3", "/source/a2.wav"], "output": "/outputs/concat_audio.wav"}
+}'
+```
+
+**`image-to-video`** — params: `image`, `output`, `duration` (giây, bắt buộc), `fps` (mặc định
+30), `crf` (tuỳ chọn). Chuyển 1 ảnh tĩnh thành 1 clip video giữ nguyên ảnh trong `duration` giây
+(ffmpeg `-loop 1 -t <duration>`) — kích thước clip lấy theo kích thước ảnh gốc (làm tròn xuống số
+chẵn, libx264 yêu cầu), `concat-video` sau đó tự chuẩn hoá lại theo item đầu tiên trong nhóm như
+mọi input khác. Dùng cho `mode="mix"`, `video_items` type="image" (xem
+`reup-orchestrator-node/README.md` mục "Nhánh mix"):
+
+```bash
+curl -s -X POST http://localhost:8103/jobs -H 'Content-Type: application/json' -d '{
+  "cmd": "image-to-video",
+  "params": {"image": "/source/cover.jpg", "output": "/outputs/cover.mp4", "duration": 5.0}
+}'
+```
+
+Cả 7 subcommand nhận thêm field tuỳ chọn `pipeline_id`/`video_name` (correlation ID cho
 structured log — xem mục dưới; `reup-orchestrator-node` tự gắn, không bắt buộc khi gọi tay).
 
 ### `GET /jobs/{id}`, `GET /health`

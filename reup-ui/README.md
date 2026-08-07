@@ -19,7 +19,9 @@ vào `legacy/`, không còn deploy.)
     `GET /voices`, hiện số lượng) + option "Khác — Clone giọng" (upload file WAV mẫu 3-5s, gửi
     base64), **select style** (`GET /styles`), subtitle mode, **chọn nhạc nền** (chỉ hiện ở
     nhánh review — chọn project/track từ thư viện qua `GET /music/projects*`, link sang
-    `#/music` để quản lý thư viện).
+    `#/music` để quản lý thư viện). Nhánh **mix** (ghép nhiều video + nhiều nhạc nối tiếp, không
+    transcribe/dịch/TTS/sub) đổi hẳn sang danh sách item thêm/xoá được thay vì 1 ô URL — mỗi
+    dòng chọn kiểu nguồn (URL/upload/tái dùng pipeline_id cũ/thư viện nhạc nền cho audio).
   - `ImportCsv` (`#/import`) — nạp file CSV (`STT,video_name,link`, có nút tải template),
     cài đặt chung (nhánh/voice/style/subtitle/nhạc nền, dùng chung cho cả danh sách) áp cho mọi
     dòng, bảng xem trước + nút Chạy/Hủy, submit tuần tự qua đúng `POST /pipelines` (hàng đợi

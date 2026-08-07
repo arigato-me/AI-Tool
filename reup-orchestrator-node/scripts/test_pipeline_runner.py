@@ -10,6 +10,7 @@ bằng cách kiểm tra `on_submitted` được gọi đúng job_id; (2) khi res
 gặp: resume sớm làm TTS chạy lại từ đầu, tốn thêm ~8 phút GPU vô ích)."""
 from __future__ import annotations
 
+import base64
 import tempfile
 import unittest
 from pathlib import Path
@@ -66,6 +67,168 @@ class VideoModeTests(unittest.TestCase):
             # rơi tiếp vào transcribe/translate/tts/editor.
             self.assertEqual(list(result["stages"].keys()), ["ytdlp"])
             self.assertEqual(mock_submit_and_wait.call_count, 1)
+
+
+class MixModeTests(unittest.TestCase):
+    """mode="mix" — ghép N video + N audio nối tiếp, không transcribe/dịch/TTS. Mock cả
+    ytdlp lẫn editor qua CÙNG 1 `submit_and_wait` (phân biệt bằng body: có "args" -> ytdlp,
+    có "cmd" -> editor) — đủ để kiểm 4 loại item resolve đúng, không cần dựng node thật."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        tmp_path = Path(self._tmp.name)
+        self._orig = {
+            "ytdlp_downloads": pr.NODES["ytdlp"]["downloads"],
+            "editor_source": pr.NODES["editor"]["source"],
+            "editor_outputs": pr.NODES["editor"]["outputs"],
+            "own_outputs": pr.OWN_OUTPUTS,
+        }
+        pr.NODES["ytdlp"]["downloads"] = tmp_path / "ytdlp_downloads"
+        pr.NODES["editor"]["source"] = tmp_path / "editor_source"
+        pr.NODES["editor"]["outputs"] = tmp_path / "editor_outputs"
+        pr.OWN_OUTPUTS = tmp_path / "outputs"
+        self.pipeline_id = "mixabcd1234"
+        self._fake_audio_duration_s: float | None = 10.0
+        self.image_to_video_calls: list[dict] = []
+
+    def tearDown(self):
+        pr.NODES["ytdlp"]["downloads"] = self._orig["ytdlp_downloads"]
+        pr.NODES["editor"]["source"] = self._orig["editor_source"]
+        pr.NODES["editor"]["outputs"] = self._orig["editor_outputs"]
+        pr.OWN_OUTPUTS = self._orig["own_outputs"]
+        self._tmp.cleanup()
+
+    def _fake_submit_and_wait(self, base_url, body, on_submitted=None, **kw):
+        if "args" in body:
+            out_idx = body["args"].index("-o") + 1
+            sub_id = Path(body["args"][out_idx]).name.split(".")[0]
+            pr.NODES["ytdlp"]["downloads"].mkdir(parents=True, exist_ok=True)
+            (pr.NODES["ytdlp"]["downloads"] / f"{sub_id}.mp4").write_bytes(b"fake")
+            return {"ok": True}
+        cmd = body.get("cmd")
+        if cmd == "image-to-video":
+            self.image_to_video_calls.append(body["params"])
+        out_name = Path(body["params"]["output"]).name
+        pr.NODES["editor"]["outputs"].mkdir(parents=True, exist_ok=True)
+        (pr.NODES["editor"]["outputs"] / out_name).write_bytes(b"fake")
+        result = {"ok": True, "cmd": cmd}
+        if cmd == "concat-audio":
+            result["duration_s"] = self._fake_audio_duration_s
+        return result
+
+    @patch("pipeline_runner.submit_and_wait")
+    def test_upload_and_library_items_resolve_and_run_concat_then_edit(self, mock_submit_and_wait):
+        mock_submit_and_wait.side_effect = self._fake_submit_and_wait
+        payload = {
+            "mode": "mix",
+            "video_items": [{"type": "upload", "data_b64": base64.b64encode(b"video-bytes").decode(), "ext": "mp4"}],
+            "audio_items": [{"type": "library", "music_project": "chill", "music_track": "song.mp3"}],
+        }
+        result = pr.run_pipeline(self.pipeline_id, payload)
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["output"].endswith("mix_final.mp4"), result["output"])
+        # upload/library không tạo job ytdlp nào — chỉ 3 stage editor.
+        self.assertEqual(
+            {"editor_concat_video", "editor_concat_audio", "editor_edit"}, set(result["stages"].keys()),
+        )
+
+    @patch("pipeline_runner.submit_and_wait")
+    def test_reuse_item_does_not_submit_new_ytdlp_job(self, mock_submit_and_wait):
+        mock_submit_and_wait.side_effect = self._fake_submit_and_wait
+        ref_id = "oldpipeline0001"
+        pr.NODES["ytdlp"]["downloads"].mkdir(parents=True, exist_ok=True)
+        (pr.NODES["ytdlp"]["downloads"] / f"{ref_id}.mp4").write_bytes(b"already-downloaded")
+        payload = {
+            "mode": "mix",
+            "video_items": [{"type": "reuse", "pipeline_id": ref_id}],
+            "audio_items": [{"type": "reuse", "pipeline_id": ref_id}],
+        }
+        result = pr.run_pipeline(self.pipeline_id, payload)
+        self.assertTrue(result["ok"])
+        self.assertFalse(any(name.startswith("ytdlp_") for name in result["stages"]))
+
+    @patch("pipeline_runner.submit_and_wait")
+    def test_url_item_downloads_via_ytdlp_with_own_sub_id(self, mock_submit_and_wait):
+        mock_submit_and_wait.side_effect = self._fake_submit_and_wait
+        payload = {
+            "mode": "mix",
+            "video_items": [{"type": "url", "url": "https://example.com/v1"}],
+            "audio_items": [{"type": "url", "url": "https://example.com/a1"}],
+        }
+        result = pr.run_pipeline(self.pipeline_id, payload)
+        self.assertTrue(result["ok"])
+        self.assertIn("ytdlp_v0", result["stages"])
+        self.assertIn("ytdlp_a0", result["stages"])
+
+    @patch("pipeline_runner.submit_and_wait")
+    def test_all_image_video_items_split_audio_duration_evenly(self, mock_submit_and_wait):
+        mock_submit_and_wait.side_effect = self._fake_submit_and_wait
+        self._fake_audio_duration_s = 10.0
+        img_b64 = base64.b64encode(b"fake-image-bytes").decode()
+        payload = {
+            "mode": "mix",
+            "video_items": [
+                {"type": "image", "data_b64": img_b64, "ext": "jpg"},
+                {"type": "image", "data_b64": img_b64, "ext": "jpg"},
+            ],
+            "audio_items": [{"type": "library", "music_project": "chill", "music_track": "song.mp3"}],
+        }
+        result = pr.run_pipeline(self.pipeline_id, payload)
+        self.assertTrue(result["ok"])
+        self.assertEqual(len(self.image_to_video_calls), 2)
+        for call in self.image_to_video_calls:
+            self.assertAlmostEqual(call["duration"], 5.0)
+
+    @patch("pipeline_runner.submit_and_wait")
+    def test_all_image_video_items_respects_explicit_duration_for_remaining_split(self, mock_submit_and_wait):
+        mock_submit_and_wait.side_effect = self._fake_submit_and_wait
+        self._fake_audio_duration_s = 10.0
+        img_b64 = base64.b64encode(b"fake-image-bytes").decode()
+        payload = {
+            "mode": "mix",
+            "video_items": [
+                {"type": "image", "data_b64": img_b64, "ext": "jpg", "duration": 4.0},
+                {"type": "image", "data_b64": img_b64, "ext": "jpg"},
+            ],
+            "audio_items": [{"type": "library", "music_project": "chill", "music_track": "song.mp3"}],
+        }
+        result = pr.run_pipeline(self.pipeline_id, payload)
+        self.assertTrue(result["ok"])
+        durations = sorted(call["duration"] for call in self.image_to_video_calls)
+        # item đã nhập 4.0 giữ nguyên, item còn lại lấy hết phần audio còn lại (10 - 4 = 6).
+        self.assertEqual(durations, [4.0, 6.0])
+
+    @patch("pipeline_runner.submit_and_wait")
+    def test_image_item_mixed_with_real_video_without_duration_raises(self, mock_submit_and_wait):
+        mock_submit_and_wait.side_effect = self._fake_submit_and_wait
+        # item "reuse" ở index 0 phải resolve XONG (file có sẵn) mới tới lượt item "image" ở
+        # index 1 raise — tạo sẵn file để không bị NodeJobError (thiếu file) che mất lỗi thật
+        # đang test (thiếu duration).
+        ref_id = "some-old-pipeline"
+        pr.NODES["ytdlp"]["downloads"].mkdir(parents=True, exist_ok=True)
+        (pr.NODES["ytdlp"]["downloads"] / f"{ref_id}.mp4").write_bytes(b"already-downloaded")
+        img_b64 = base64.b64encode(b"fake-image-bytes").decode()
+        payload = {
+            "mode": "mix",
+            "video_items": [
+                {"type": "reuse", "pipeline_id": ref_id},
+                {"type": "image", "data_b64": img_b64, "ext": "jpg"},  # thiếu duration, trộn video thật
+            ],
+            "audio_items": [{"type": "library", "music_project": "chill", "music_track": "song.mp3"}],
+        }
+        with self.assertRaises(ValueError):
+            pr.run_pipeline(self.pipeline_id, payload)
+
+    def test_empty_video_items_raises(self):
+        payload = {"mode": "mix", "video_items": [],
+                   "audio_items": [{"type": "library", "music_project": "a", "music_track": "b.mp3"}]}
+        with self.assertRaises(ValueError):
+            pr.run_pipeline(self.pipeline_id, payload)
+
+    def test_empty_audio_items_raises(self):
+        payload = {"mode": "mix", "video_items": [{"type": "reuse", "pipeline_id": "x"}], "audio_items": []}
+        with self.assertRaises(ValueError):
+            pr.run_pipeline(self.pipeline_id, payload)
 
 
 class ResumeJobIdReattachTests(unittest.TestCase):

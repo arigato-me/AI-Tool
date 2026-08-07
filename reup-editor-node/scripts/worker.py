@@ -9,7 +9,10 @@ import traceback
 import redis as redis_lib
 
 import queue_lib as q
+from concat_audio_cli import run_concat_audio
+from concat_video_cli import run_concat_video
 from edit_cli import run_edit
+from image_to_video_cli import run_image_to_video
 from json_to_srt import run_srt
 from mix_dialogue_cli import run_mix_dialogue
 from mix_music_cli import run_mix_music
@@ -22,6 +25,9 @@ DISPATCH = {
     "srt": run_srt,
     "mix-dialogue": run_mix_dialogue,
     "mix-music": run_mix_music,
+    "concat-video": run_concat_video,
+    "concat-audio": run_concat_audio,
+    "image-to-video": run_image_to_video,
 }
 
 

@@ -13,6 +13,7 @@ import {
   submitPipeline,
   voiceSampleUrl,
   DEFAULT_SUB_STYLE,
+  MixItem,
   MusicDefault,
   MusicProject,
   MusicTrack,
@@ -25,10 +26,139 @@ import { normalizeVideoUrl } from "../lib/normalizeUrl";
 import { RetryPayload } from "../App";
 import Dropdown from "../components/Dropdown";
 import FieldInfo from "../components/FieldInfo";
+import TrashIcon from "../components/TrashIcon";
 
 const CLONE_VALUE = "__clone__";
 const CUSTOM_MUSIC_VALUE = "__custom_music__";
 const NO_MUSIC_VALUE = "";
+
+// mode="mix" — draft state cho 1 dòng video/audio trước khi submit (chưa base64 hoá file upload,
+// chưa chuẩn hoá url — làm ở handleSubmit, xem toMixItem()).
+interface MixItemDraft {
+  type: "url" | "upload" | "reuse" | "library" | "image";
+  url?: string;
+  file?: File | null;
+  pipelineId?: string;
+  musicProject?: string;
+  musicTrack?: string;
+  // type="image" — giây, để trống nếu CẢ danh sách video toàn ảnh (chia đều theo audio lúc
+  // chạy). Bắt buộc nếu trộn ảnh với video thật khác trong cùng danh sách.
+  duration?: number;
+}
+
+function MixItemRow({
+  index, kind, item, onChange, onRemove, allowLibrary, allowImage, musicProjects, libraryTracksByProject, onLoadTracks,
+}: {
+  index: number;
+  kind: "video" | "audio";
+  item: MixItemDraft;
+  onChange: (patch: Partial<MixItemDraft>) => void;
+  onRemove: () => void;
+  allowLibrary: boolean;
+  allowImage: boolean;
+  musicProjects: MusicProject[];
+  libraryTracksByProject: Record<string, MusicTrack[]>;
+  onLoadTracks: (slug: string) => void;
+}) {
+  const ord = index + 1;
+  const kindLabel = kind === "video" ? "Video" : "Audio";
+  return (
+    <div className="mix-item-row">
+      <span className="mix-item-index" aria-hidden="true">{ord}</span>
+      <Dropdown
+        className="mix-item-type"
+        ariaLabel={`${kindLabel} #${ord} — loại nguồn`}
+        value={item.type}
+        onChange={(v) => onChange({ type: v as MixItemDraft["type"] })}
+        options={[
+          { value: "url", label: "URL" },
+          { value: "upload", label: "Upload file" },
+          { value: "reuse", label: "Dùng lại pipeline_id cũ" },
+          ...(allowLibrary ? [{ value: "library", label: "Thư viện nhạc nền" }] : []),
+          ...(allowImage ? [{ value: "image", label: "Ảnh tĩnh" }] : []),
+        ]}
+      />
+      <div className="mix-item-field">
+        {item.type === "url" && (
+          <input
+            value={item.url ?? ""}
+            onChange={(e) => onChange({ url: e.target.value })}
+            placeholder="https://..."
+            aria-label={`${kindLabel} #${ord} — URL`}
+          />
+        )}
+        {item.type === "upload" && (
+          <input
+            type="file"
+            onChange={(e) => onChange({ file: e.target.files?.[0] ?? null })}
+            aria-label={`${kindLabel} #${ord} — file upload`}
+          />
+        )}
+        {item.type === "reuse" && (
+          <input
+            value={item.pipelineId ?? ""}
+            onChange={(e) => onChange({ pipelineId: e.target.value })}
+            placeholder="vd: 8f2a1c... (pipeline_id cũ)"
+            aria-label={`${kindLabel} #${ord} — pipeline_id cũ`}
+          />
+        )}
+        {item.type === "image" && (
+          <div className="mix-item-image">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => onChange({ file: e.target.files?.[0] ?? null })}
+              aria-label={`${kindLabel} #${ord} — ảnh tĩnh`}
+            />
+            <input
+              type="number"
+              min={0}
+              step="0.1"
+              value={item.duration ?? ""}
+              onChange={(e) => onChange({ duration: e.target.value ? Number(e.target.value) : undefined })}
+              placeholder="Thời lượng giây (để trống nếu toàn ảnh)"
+              aria-label={`${kindLabel} #${ord} — thời lượng ảnh (giây)`}
+            />
+          </div>
+        )}
+        {item.type === "library" && (
+          <div className="mix-item-library">
+            <Dropdown
+              ariaLabel={`${kindLabel} #${ord} — chủ đề nhạc nền`}
+              value={item.musicProject ?? ""}
+              onChange={(v) => {
+                onChange({ musicProject: v, musicTrack: "" });
+                if (v) onLoadTracks(v);
+              }}
+              options={[
+                { value: "", label: "Chọn chủ đề..." },
+                ...musicProjects.map((p) => ({ value: p.slug, label: p.display_name })),
+              ]}
+            />
+            <Dropdown
+              ariaLabel={`${kindLabel} #${ord} — track`}
+              value={item.musicTrack ?? ""}
+              onChange={(v) => onChange({ musicTrack: v })}
+              options={[
+                { value: "", label: "Chọn track..." },
+                ...(libraryTracksByProject[item.musicProject ?? ""] ?? []).map((t) => ({ value: t.track, label: t.display_name })),
+              ]}
+            />
+          </div>
+        )}
+      </div>
+      <button
+        type="button"
+        className="btn-icon-danger"
+        onClick={onRemove}
+        title={`Xoá ${kindLabel.toLowerCase()} #${ord}`}
+        aria-label={`Xoá ${kindLabel.toLowerCase()} #${ord}`}
+      >
+        <TrashIcon />
+      </button>
+    </div>
+  );
+}
 
 interface SubmitJobProps {
   initial?: RetryPayload;
@@ -37,7 +167,7 @@ interface SubmitJobProps {
 export default function SubmitJob({ initial }: SubmitJobProps) {
   const [url, setUrl] = useState(initial?.url ?? "");
   const [videoName, setVideoName] = useState(initial?.video_name ?? "");
-  const [mode, setMode] = useState<"review" | "dialogue" | "subtitle" | "audio" | "video" | "book">(initial?.mode ?? "review");
+  const [mode, setMode] = useState<"review" | "dialogue" | "subtitle" | "audio" | "video" | "book" | "mix">(initial?.mode ?? "review");
   // "audio"/"video" đều dừng ngay sau ytdlp (chỉ tải, không transcribe/dịch/TTS/mux) — mọi field
   // downstream (source_lang, voice, style, subtitle_mode, clone giọng, nhạc nền) đều vô nghĩa.
   const isDownloadOnly = mode === "audio" || mode === "video";
@@ -45,6 +175,9 @@ export default function SubmitJob({ initial }: SubmitJobProps) {
   // nền/clone giọng (nhiều nhân vật, mỗi người 1 giọng — clone chỉ cho 1 giọng, không hợp round-
   // robin nhiều nhân vật, xem reup-orchestrator-node/README.md).
   const isBook = mode === "book";
+  // "mix" — ghép N video + N audio nối tiếp, cũng không có url/voice/sub gì (giống book, dùng
+  // hẳn danh sách item riêng thay vì url đơn — xem video_items/audio_items bên dưới).
+  const isMix = mode === "mix";
   const [sourceLang, setSourceLang] = useState<"zh" | "other">(initial?.source_lang ?? "zh");
   // Nhiều file (sách chụp nhiều ảnh, 1 ảnh/trang) — gộp theo đúng thứ tự chọn/kéo-thả của
   // input[multiple] (trình duyệt giữ nguyên thứ tự này, không tự sắp xếp lại theo tên file).
@@ -83,6 +216,18 @@ export default function SubmitJob({ initial }: SubmitJobProps) {
   // chọn lại đúng giá trị mặc định).
   const [musicTouched, setMusicTouched] = useState(false);
   const [libraryDefault, setLibraryDefault] = useState<MusicDefault | null>(null);
+
+  const [videoItems, setVideoItems] = useState<MixItemDraft[]>([{ type: "url" }]);
+  const [audioItems, setAudioItems] = useState<MixItemDraft[]>([{ type: "url" }]);
+  // Cache track theo project — mỗi dòng audio kiểu "library" có thể chọn chủ đề khác nhau, tải
+  // 1 lần/chủ đề (không tải lại nếu dòng khác cùng chọn chủ đề đã cache).
+  const [libraryTracksByProject, setLibraryTracksByProject] = useState<Record<string, MusicTrack[]>>({});
+
+  async function loadLibraryTracksForMix(slug: string) {
+    if (libraryTracksByProject[slug]) return;
+    const res = await getMusicTracks(slug);
+    if (res.ok) setLibraryTracksByProject((prev) => ({ ...prev, [slug]: res.tracks }));
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -192,6 +337,72 @@ export default function SubmitJob({ initial }: SubmitJobProps) {
     setSubmitting(true);
     setError(null);
     try {
+      if (isMix) {
+        if (videoItems.length === 0) {
+          setError("Thêm ít nhất 1 video");
+          return;
+        }
+        if (audioItems.length === 0) {
+          setError("Thêm ít nhất 1 nhạc/audio");
+          return;
+        }
+        // Ảnh chưa nhập duration CHỈ hợp lệ khi CẢ danh sách video_items toàn ảnh (chia đều theo
+        // audio lúc chạy, xem pipeline_runner.py::_run_mix_pipeline) — trộn cùng video thật bắt
+        // buộc mỗi ảnh tự nhập duration, khớp validate ở api.py::submit_pipeline.
+        const allVideoItemsAreImages = videoItems.every((it) => it.type === "image");
+        for (const it of [...videoItems, ...audioItems]) {
+          if (it.type === "url" && !it.url?.trim()) {
+            setError("Có dòng thiếu URL");
+            return;
+          }
+          if ((it.type === "upload" || it.type === "image") && !it.file) {
+            setError(it.type === "image" ? "Có dòng thiếu file ảnh" : "Có dòng thiếu file upload");
+            return;
+          }
+          if (it.type === "reuse" && !it.pipelineId?.trim()) {
+            setError("Có dòng thiếu pipeline_id để dùng lại");
+            return;
+          }
+          if (it.type === "library" && (!it.musicProject || !it.musicTrack)) {
+            setError("Có dòng thư viện nhạc nền chưa chọn chủ đề/track");
+            return;
+          }
+          if (it.type === "image" && !allVideoItemsAreImages && !(it.duration && it.duration > 0)) {
+            setError("Ảnh trộn cùng video thật cần nhập thời lượng (giây)");
+            return;
+          }
+        }
+        const toMixItem = async (it: MixItemDraft): Promise<MixItem> => {
+          if (it.type === "url") return { type: "url", url: normalizeVideoUrl(it.url!.trim()) };
+          if (it.type === "upload") {
+            const f = it.file!;
+            return { type: "upload", data_b64: await fileToBase64(f), ext: f.name.split(".").pop()?.toLowerCase() || "" };
+          }
+          if (it.type === "image") {
+            const f = it.file!;
+            return {
+              type: "image", data_b64: await fileToBase64(f), ext: f.name.split(".").pop()?.toLowerCase() || "",
+              duration: it.duration,
+            };
+          }
+          if (it.type === "reuse") return { type: "reuse", pipeline_id: it.pipelineId!.trim() };
+          return { type: "library", music_project: it.musicProject, music_track: it.musicTrack };
+        };
+        const video_items = await Promise.all(videoItems.map(toMixItem));
+        const audio_items = await Promise.all(audioItems.map(toMixItem));
+        const res = await submitPipeline({
+          mode: "mix",
+          video_name: videoName.trim() || undefined,
+          video_items,
+          audio_items,
+        });
+        if (!res.ok || !res.pipeline_id) {
+          setError(res.error || "Không tạo được job");
+          return;
+        }
+        window.location.hash = `#/job/${res.pipeline_id}`;
+        return;
+      }
       if (isBook) {
         if (documentFiles.length === 0) {
           setError("Chọn ít nhất 1 file pdf/docx/pptx/xlsx/ảnh để trích văn bản");
@@ -274,7 +485,7 @@ export default function SubmitJob({ initial }: SubmitJobProps) {
       <p className="stage-detail">
         Có nhiều video cùng lúc? <a href="#/import">Import cả danh sách qua CSV →</a>
       </p>
-      {!isBook && (
+      {!isBook && !isMix && (
         <label>
           <span className="field-label-row">
             URL video
@@ -312,6 +523,58 @@ export default function SubmitJob({ initial }: SubmitJobProps) {
           )}
         </label>
       )}
+      {isMix && (
+        <div className="mix-lists">
+          <div>
+            <span className="field-label-row">
+              Video nguồn (nối tiếp theo thứ tự)
+              <FieldInfo text="Mỗi dòng 1 video: url (tải qua yt-dlp), upload file, dùng lại pipeline_id của 1 lần chạy trước, hoặc ảnh tĩnh (chuyển thành clip video giữ nguyên ảnh). Video khác resolution/fps sẽ tự chuẩn hoá theo video đầu tiên trước khi nối. Ảnh cần nhập thời lượng riêng nếu trộn cùng video thật; để trống nếu CẢ danh sách toàn ảnh (tự chia đều theo độ dài audio)." />
+            </span>
+            {videoItems.map((it, i) => (
+              <MixItemRow
+                key={i}
+                index={i}
+                kind="video"
+                item={it}
+                onChange={(patch) => setVideoItems((prev) => prev.map((x, idx) => (idx === i ? { ...x, ...patch } : x)))}
+                onRemove={() => setVideoItems((prev) => prev.filter((_, idx) => idx !== i))}
+                allowLibrary={false}
+                allowImage
+                musicProjects={musicProjects}
+                libraryTracksByProject={libraryTracksByProject}
+                onLoadTracks={loadLibraryTracksForMix}
+              />
+            ))}
+            <button type="button" className="mix-item-add" onClick={() => setVideoItems((prev) => [...prev, { type: "url" }])}>
+              + Thêm video
+            </button>
+          </div>
+          <div>
+            <span className="field-label-row">
+              Nhạc/audio nguồn (nối tiếp theo thứ tự)
+              <FieldInfo text="Mỗi dòng 1 audio: url, upload file, dùng lại pipeline_id cũ, hoặc chọn track có sẵn trong thư viện nhạc nền. Track ngắn hơn (video hoặc audio, cái nào ngắn hơn) sẽ quyết định độ dài video xuất cuối." />
+            </span>
+            {audioItems.map((it, i) => (
+              <MixItemRow
+                key={i}
+                index={i}
+                kind="audio"
+                item={it}
+                onChange={(patch) => setAudioItems((prev) => prev.map((x, idx) => (idx === i ? { ...x, ...patch } : x)))}
+                onRemove={() => setAudioItems((prev) => prev.filter((_, idx) => idx !== i))}
+                allowLibrary
+                allowImage={false}
+                musicProjects={musicProjects}
+                libraryTracksByProject={libraryTracksByProject}
+                onLoadTracks={loadLibraryTracksForMix}
+              />
+            ))}
+            <button type="button" className="mix-item-add" onClick={() => setAudioItems((prev) => [...prev, { type: "url" }])}>
+              + Thêm audio
+            </button>
+          </div>
+        </div>
+      )}
       <label>
         <span className="field-label-row">
           Tên video (tuỳ chọn)
@@ -330,7 +593,8 @@ export default function SubmitJob({ initial }: SubmitJobProps) {
             text={
               "review: mute audio gốc, 1 giọng thuyết minh. dialogue: giữ nền gốc, chỉ mute tiếng Trung. " +
               "subtitle: chỉ thêm phụ đề, giữ nguyên audio gốc. audio: chỉ tải mp3, không xử lý gì thêm. " +
-              "video: chỉ tải video gốc, không xử lý gì thêm. book: Sách → Audio, tự động nhiều giọng theo nhân vật."
+              "video: chỉ tải video gốc, không xử lý gì thêm. book: Sách → Audio, tự động nhiều giọng theo nhân vật. " +
+              "mix: ghép nhiều video + nhiều nhạc/audio nối tiếp, không transcribe/dịch/TTS/sub."
             }
           />
         </span>
@@ -358,6 +622,10 @@ export default function SubmitJob({ initial }: SubmitJobProps) {
           <label>
             <input type="radio" name="mode" checked={mode === "book"} onChange={() => setMode("book")} />
             book
+          </label>
+          <label>
+            <input type="radio" name="mode" checked={mode === "mix"} onChange={() => setMode("mix")} />
+            mix
           </label>
         </div>
       </label>
@@ -411,7 +679,7 @@ export default function SubmitJob({ initial }: SubmitJobProps) {
           động được gán 1 giọng riêng từ danh sách có sẵn.
         </p>
       )}
-      {!isDownloadOnly && !isBook && (
+      {!isDownloadOnly && !isBook && !isMix && (
         <label>
           <span className="field-label-row">
             Ngôn ngữ gốc video
@@ -482,7 +750,7 @@ export default function SubmitJob({ initial }: SubmitJobProps) {
           <Dropdown value={style} onChange={setStyle} options={styles.map((s) => ({ value: s.id, label: s.label }))} />
         </label>
       )}
-      {!isDownloadOnly && !isBook && (
+      {!isDownloadOnly && !isBook && !isMix && (
       <>
         {mode !== "subtitle" && (
           <label>

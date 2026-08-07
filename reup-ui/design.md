@@ -97,3 +97,23 @@ dùng đã quen mắt.
   nhìn giống các khối text thường khác trên trang.
 - Không đổi genre/theme/font — vẫn modern-minimal, system-ui, accent xanh cũ, đúng constraint
   "web nhẹ/nhanh" gốc. Đây là nâng cấp lớp component/độ sâu, không phải đổi hệ thống.
+
+## Amend 2026-08-05 — danh sách item mode="mix" (SubmitJob.tsx)
+
+- **`.mix-item-row`**: mỗi dòng video/audio nguồn (`SubmitJob.tsx::MixItemRow`) bọc thành 1 hàng
+  nhỏ (nền `--color-paper` — lõm nhẹ so với `.card` nền `--color-paper-2` cha, viền
+  `--color-rule`) thay vì nằm trần trên nền card — cùng tinh thần "độ sâu nhẹ" đã áp cho `.card`
+  ở amend trước, áp xuống 1 cấp component con.
+- **Bỏ nhãn "Loại nguồn"/"URL" lặp lại mỗi dòng** (rối mắt khi có 3-4 dòng) — thay bằng
+  `aria-label` trên từng field (`Dropdown` có thêm prop `ariaLabel?: string`, optional, không vỡ
+  chỗ dùng cũ) + số thứ tự tròn nhỏ (`.mix-item-index`, nền `--color-info-bg`) nhắc thứ tự
+  nối/concat.
+- **Canh dòng bằng `display:flex; align-items:center`** (giống `.list-row` đã có ở
+  `MusicLibrary.tsx`) thay vì `.row` (CSS grid) + `align-items:end` + đệm ẩn giả chiều cao label
+  — cách cũ 2 lần canh sai (lệch xuống, rồi lệch tiếp vì đệm sai margin) trước khi đổi hẳn sang
+  flex+center, robust hơn hẳn, không còn phép tính chiều cao thủ công nào.
+- Nút "+ Thêm video"/"+ Thêm audio" đổi từ `.btn-secondary` (đặc, giống nút hành động thường)
+  sang `.mix-item-add` (viền đứt nét, nền trong suốt) — ngôn ngữ "thêm dòng vào danh sách" chuẩn
+  hơn, phân biệt rõ với nút submit/hành động chính.
+- Không thêm dependency, không đổi `api.ts`/handler submit — chỉ CSS + cấu trúc JSX hiển thị của
+  `MixItemRow`, đúng ràng buộc "Ghi chú kỹ thuật" ở trên.

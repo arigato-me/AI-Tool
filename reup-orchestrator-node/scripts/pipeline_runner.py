@@ -70,6 +70,11 @@ OWN_OUTPUTS = Path("/outputs")
 
 NARRATOR_SPEAKER = "narrator"
 
+# mode="mix" — sàn tối thiểu cho ảnh khi chia đều audio_duration cho N ảnh chưa nhập duration
+# (xem _run_mix_pipeline) — tránh 0s/âm nếu tổng duration đã nhập tay của các ảnh khác đã vượt
+# quá audio (hiếm nhưng có thể, người dùng nhập tay sai).
+MIN_IMAGE_DURATION_FALLBACK_S = 3.0
+
 
 def _get_voice_pool() -> list[str]:
     """Danh sách id giọng có sẵn — dùng để auto gán giọng cho từng nhân vật (mode="book",
@@ -468,12 +473,184 @@ def _run_book_pipeline(
     return result
 
 
+def _resolve_mix_item(
+    kind: str, idx: int, item: dict, stem: str, pipeline_id: str,
+    _run_stage, _resumed_result, _mark_resumed,
+) -> Path | str:
+    """Quy 1 video/audio item (mode="mix") về 1 file cục bộ đã copy sẵn vào /source của
+    editor-node (Path), hoặc 1 container-path thẳng (str, chỉ type="library" — track nhạc nền
+    đọc thẳng từ /music read-only, không copy qua đâu cả). `kind`: "v" (video_items) | "a"
+    (audio_items) — chỉ dùng đặt tên stage/sub-id, tránh đụng độ khi có nhiều item cùng loại
+    trong 1 pipeline."""
+    item_type = item.get("type")
+    if item_type == "url":
+        # sub-id riêng mỗi item (không dùng thẳng pipeline_id như bước ytdlp chính) — 1 pipeline
+        # mix có thể có nhiều item url, mỗi item cần tên file tải về khác nhau.
+        sub_id = f"{pipeline_id}_{kind}{idx}"
+        stage_name = f"ytdlp_{kind}{idx}"
+        existing = sorted(glob.glob(str(NODES["ytdlp"]["downloads"] / f"{sub_id}.*")))
+        resumed = _resumed_result(stage_name, None) if existing else None
+        if resumed is not None:
+            _mark_resumed(stage_name, resumed)
+            matches = existing
+        else:
+            url_match = re.search(r'https?://\S+', item.get("url") or "")
+            if not url_match:
+                raise ValueError(f"{kind}_items[{idx}] thiếu url hợp lệ")
+            # audio_items type="url": ép yt-dlp tự trích + convert mp3 ngay lúc tải, y hệt
+            # mode="audio" ở _run_pipeline_impl — khỏi viết ffmpeg -vn riêng.
+            ytdlp_args = ["-x", "--audio-format", "mp3"] if kind == "a" else []
+            out_template = f"/downloads/{sub_id}.%(ext)s"
+            ytdlp_args = ["-o", out_template] + ytdlp_args + [url_match.group(0)]
+            _run_stage(stage_name, YTDLP_URL, {"args": ytdlp_args})
+            matches = sorted(glob.glob(str(NODES["ytdlp"]["downloads"] / f"{sub_id}.*")))
+        if not matches:
+            raise NodeJobError(f"ytdlp không sinh ra file nào khớp {sub_id}.* ({kind}_items[{idx}])")
+        src = Path(matches[0])
+        return _copy(src, NODES["editor"]["source"], f"{stem}_{kind}{idx:02d}{src.suffix}")
+    if item_type == "upload":
+        ext = (item.get("ext") or "").lstrip(".").lower()
+        data_b64 = item.get("data_b64")
+        if not ext or not data_b64:
+            raise ValueError(f"{kind}_items[{idx}] thiếu 'ext'/'data_b64'")
+        dst = NODES["editor"]["source"] / f"{stem}_{kind}{idx:02d}_upload.{ext}"
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if not dst.exists():
+            dst.write_bytes(base64.b64decode(data_b64))
+        return dst
+    if item_type == "reuse":
+        # Tái dùng file 1 pipeline cũ đã tải (KHÔNG tạo job ytdlp mới) — file vẫn nằm sẵn ở
+        # downloads (đặt tên theo pipeline_id, đúng convention bước ytdlp chính bên dưới).
+        ref_id = item.get("pipeline_id")
+        if not ref_id:
+            raise ValueError(f"{kind}_items[{idx}] type='reuse' thiếu pipeline_id")
+        matches = sorted(glob.glob(str(NODES["ytdlp"]["downloads"] / f"{ref_id}.*")))
+        if not matches:
+            raise NodeJobError(f"không tìm thấy file đã tải cho pipeline_id={ref_id!r} ({kind}_items[{idx}])")
+        src = Path(matches[0])
+        return _copy(src, NODES["editor"]["source"], f"{stem}_{kind}{idx:02d}{src.suffix}")
+    if item_type == "library" and kind == "a":
+        project, track = item.get("music_project"), item.get("music_track")
+        if not project or not track:
+            raise ValueError(f"audio_items[{idx}] type='library' thiếu music_project/music_track")
+        return f"/music/{_safe_music_seg(project)}/{_safe_music_seg(track)}"
+    if item_type == "image" and kind == "v":
+        # Ảnh tĩnh -> 1 clip video giữ nguyên ảnh trong `duration` giây (đã được set sẵn ở
+        # _run_mix_pipeline TRƯỚC khi gọi hàm này — validate ở api.py hoặc tính mặc định chia
+        # đều theo audio nếu cả video_items toàn ảnh). Trả về container-path thẳng trong
+        # /outputs của editor-node (giống "library") — KHÔNG phải /source, vì file này do chính
+        # editor-node sinh ra (job image-to-video), không phải copy từ orchestrator qua.
+        ext = (item.get("ext") or "").lstrip(".").lower()
+        data_b64 = item.get("data_b64")
+        if not ext or not data_b64:
+            raise ValueError(f"{kind}_items[{idx}] type='image' thiếu 'ext'/'data_b64'")
+        duration = item.get("duration")
+        if not duration or duration <= 0:
+            raise ValueError(f"{kind}_items[{idx}] type='image' thiếu duration hợp lệ (> 0)")
+        img_name = f"{stem}_{kind}{idx:02d}_image.{ext}"
+        img_dst = NODES["editor"]["source"] / img_name
+        img_dst.parent.mkdir(parents=True, exist_ok=True)
+        if not img_dst.exists():
+            img_dst.write_bytes(base64.b64decode(data_b64))
+        stage_name = f"image_to_video_{kind}{idx}"
+        out_name = f"{stem}_{kind}{idx:02d}_image.mp4"
+        _run_stage(stage_name, EDITOR_URL, {
+            "cmd": "image-to-video",
+            "params": {"image": f"/source/{img_name}", "output": f"/outputs/{out_name}", "duration": duration},
+        }, resume_check=NODES["editor"]["outputs"] / out_name)
+        return f"/outputs/{out_name}"
+    raise ValueError(f"{kind}_items[{idx}].type không hợp lệ: {item_type!r}")
+
+
+def _run_mix_pipeline(
+    pipeline_id: str, payload: dict, stages: dict[str, dict], conn=None, resume_stages: dict | None = None,
+) -> dict:
+    """mode="mix" — ghép N video nối tiếp + N audio nối tiếp, KHÔNG transcribe/dịch/TTS/sub gì
+    cả (khác hẳn review/dialogue/subtitle). Mỗi item video_items/audio_items resolve qua
+    `_resolve_mix_item()` (url/upload/reuse/library/image), ghép video/audio riêng bằng 2 cmd mới
+    concat-video/concat-audio của editor-node, rồi mux lại bằng đúng cmd="edit" có sẵn — `-shortest`
+    đã có sẵn trong `run_edit()` (edit_cli.py) chính là cơ chế "track ngắn hơn thắng" cần, không
+    viết lại mux. audio_items resolve + concat-audio chạy TRƯỚC video_items (khác thứ tự bản đầu)
+    — cần biết tổng độ dài audio để tính mặc định duration cho ảnh tĩnh (video_items type="image"
+    chưa nhập duration, chỉ áp dụng khi TOÀN BỘ video_items là ảnh) trước khi sinh clip từ ảnh."""
+    resume_stages = resume_stages or {}
+    video_items = payload.get("video_items") or []
+    audio_items = payload.get("audio_items") or []
+    if not video_items:
+        raise ValueError("mode='mix' cần video_items (ít nhất 1)")
+    if not audio_items:
+        raise ValueError("mode='mix' cần audio_items (ít nhất 1)")
+
+    video_name = _sanitize_video_name(payload.get("video_name"))
+    stem = f"{video_name}_{pipeline_id[:8]}" if video_name else pipeline_id
+    export_stem = f"mix_{video_name}" if video_name else "mix_final"
+    job_out_dir = OWN_OUTPUTS / pipeline_id
+
+    _run_stage, _resumed_result, _mark_resumed = _make_run_stage(pipeline_id, video_name, stages, conn, resume_stages)
+
+    def _to_container_path(resolved: Path | str) -> str:
+        return resolved if isinstance(resolved, str) else f"/source/{resolved.name}"
+
+    # audio_items resolve + concat-audio chạy TRƯỚC video_items — cần biết tổng độ dài audio
+    # (duration_s trong result concat-audio) để tính mặc định cho ảnh tĩnh (type="image") chưa
+    # nhập duration, TRƯỚC khi resolve video_items (ảnh cần duration đã biết mới sinh clip được).
+    audio_inputs = [
+        _to_container_path(_resolve_mix_item("a", i, it, stem, pipeline_id, _run_stage, _resumed_result, _mark_resumed))
+        for i, it in enumerate(audio_items)
+    ]
+    concat_audio_name = f"{stem}_concat_audio.wav"
+    concat_audio_result = _run_stage("editor_concat_audio", EDITOR_URL, {
+        "cmd": "concat-audio",
+        "params": {"inputs": audio_inputs, "output": f"/outputs/{concat_audio_name}"},
+    }, resume_check=NODES["editor"]["outputs"] / concat_audio_name)
+    audio_duration_s = concat_audio_result.get("duration_s")
+
+    # Ảnh tĩnh chưa nhập duration — chỉ xảy ra khi TOÀN BỘ video_items là ảnh (đã validate ở
+    # api.py::submit_pipeline, trộn ảnh+video thật bắt buộc nhập tay từ trước) — chia đều PHẦN
+    # audio còn lại (sau khi trừ các ảnh đã tự nhập duration) cho các ảnh còn thiếu.
+    if all(it.get("type") == "image" for it in video_items):
+        explicit_total = sum(it["duration"] for it in video_items if it.get("duration"))
+        unset_items = [it for it in video_items if not it.get("duration")]
+        if unset_items and audio_duration_s:
+            per_item = max(audio_duration_s - explicit_total, 0) / len(unset_items)
+            for it in unset_items:
+                it["duration"] = per_item or MIN_IMAGE_DURATION_FALLBACK_S
+
+    video_inputs = [
+        _to_container_path(_resolve_mix_item("v", i, it, stem, pipeline_id, _run_stage, _resumed_result, _mark_resumed))
+        for i, it in enumerate(video_items)
+    ]
+    concat_video_name = f"{stem}_concat_video.mp4"
+    _run_stage("editor_concat_video", EDITOR_URL, {
+        "cmd": "concat-video",
+        "params": {"inputs": video_inputs, "output": f"/outputs/{concat_video_name}"},
+    }, resume_check=NODES["editor"]["outputs"] / concat_video_name)
+
+    # Mux lại bằng đúng cmd="edit" có sẵn (không viết lại logic mux/-shortest) — video/audio input
+    # đọc lại từ /outputs của CHÍNH editor-node (kết quả 2 bước concat trên), không phải /source.
+    final_name = f"mix_{stem}_final.mp4"
+    _run_stage("editor_edit", EDITOR_URL, {
+        "cmd": "edit",
+        "params": {
+            "video": f"/outputs/{concat_video_name}",
+            "audio": f"/outputs/{concat_audio_name}",
+            "output": f"/outputs/{final_name}",
+            "subtitles": None,
+            "subtitle_mode": "none",
+        },
+    }, resume_check=NODES["editor"]["outputs"] / final_name)
+    final_video_path = NODES["editor"]["outputs"] / final_name
+
+    final_out = _copy(final_video_path, job_out_dir, f"{export_stem}.mp4")
+    return {"ok": True, "output": str(final_out), "video_name": video_name, "stages": stages}
+
+
 def _run_pipeline_impl(
     pipeline_id: str, payload: dict, stages: dict[str, dict], conn=None, resume_stages: dict | None = None,
 ) -> dict:
     resume_stages = resume_stages or {}
     mode = payload.get("mode", "review")
-    if mode not in ("review", "dialogue", "subtitle", "audio", "video", "book"):
+    if mode not in ("review", "dialogue", "subtitle", "audio", "video", "book", "mix"):
         raise ValueError(f"mode không hợp lệ: {mode}")
 
     # mode="book": KHÔNG có url/video nguồn — input là 1 file pdf/docx/pptx/xlsx/ảnh upload
@@ -482,6 +659,9 @@ def _run_pipeline_impl(
     # book không có field này).
     if mode == "book":
         return _run_book_pipeline(pipeline_id, payload, stages, conn, resume_stages)
+    # mode="mix": ghép N video + N audio nối tiếp, cũng KHÔNG có url đơn — tách sớm y hệt book.
+    if mode == "mix":
+        return _run_mix_pipeline(pipeline_id, payload, stages, conn, resume_stages)
 
     url = payload["url"]
     # Client thường paste nguyên văn bảng share (đt Douyin/TikTok...) kèm rác quanh link

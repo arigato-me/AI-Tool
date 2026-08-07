@@ -1,7 +1,10 @@
-"""Cắt đầu/đuôi 1 file mp3 đã có sẵn (output của pipeline mode="audio") — CHỈ mp3: mp3 không có
-khái niệm keyframe/GOP như video nên `-c copy` (stream copy, không re-encode) cắt được ngay tại
-mọi mốc thời gian, không lệch. Mở rộng sang cắt mp4 (review/dialogue) sẽ cần re-encode để cắt
-đúng vị trí phi-keyframe — ngoài phạm vi hiện tại (chỉ nhánh audio, theo đúng yêu cầu).
+"""Cắt đầu/đuôi 1 file mp3/mp4 đã có sẵn (output đã 'finished' của pipeline) bằng `-c copy`
+(stream copy, không re-encode) — cắt tức thời, 0 tốn CPU thêm, không ảnh hưởng service khác.
+mp3 không có khái niệm keyframe/GOP nên cắt chính xác tuyệt đối tại mọi mốc thời gian. Video
+(mp4/webm/mkv) CÓ keyframe/GOP — stream copy chỉ cắt được tại keyframe gần nhất, điểm cắt thực
+tế có thể lệch vài giây so với start/end yêu cầu tuỳ khoảng cách keyframe của video gốc (đánh đổi
+đã chốt: chấp nhận lệch để đổi lấy tốc độ/an toàn — cắt frame-chính-xác cần re-encode, tốn CPU
+đáng kể tuỳ độ dài/độ phân giải, không đáng cho nhu cầu cắt nhanh đầu/đuôi này).
 
 Chạy trực tiếp trong `api` (không qua job queue của worker) vì đây là 1 lệnh ffmpeg cục bộ,
 nhanh (stream copy, không re-encode), không phải gọi HTTP sang node khác — xem lý do mount
@@ -27,7 +30,7 @@ def _to_seconds(value: str) -> float:
     return seconds
 
 
-def trim_audio(input_path: str, output_path: str, start: str | None, end: str | None) -> dict:
+def trim_media(input_path: str, output_path: str, start: str | None, end: str | None) -> dict:
     """start/end: giây (số) hoặc "HH:MM:SS"/"MM:SS". Chỉ cần 1 trong 2 (cắt đầu HOẶC cắt đuôi),
     có thể truyền cả 2 (cắt cả 2 đầu).
 
