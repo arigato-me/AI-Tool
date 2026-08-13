@@ -1,0 +1,9 @@
+# Copy vào data/config/browser_targets.yaml (đã gitignore qua rule */data/) rồi điền thật.
+# Recipient mặc định cho từng platform "session trình duyệt" — cấu hình 1 lần, không phải
+# per-job (job chỉ chọn platform, không chọn người nhận).
+whatsapp:
+  phone: "84xxxxxxxxx"  # số điện thoại đầy đủ mã quốc gia, không dấu +/khoảng trắng
+zalo:
+  contact_name: "Tên hiển thị contact trên Zalo"
+messenger:
+  thread_url: "https://www.messenger.com/t/<username hoặc thread id>"

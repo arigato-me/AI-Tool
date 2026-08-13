@@ -1,0 +1,6 @@
+# Copy vào data/config/webhooks.yaml (đã gitignore qua rule */data/) rồi điền thật.
+# 1 entry = 1 webapp tự phát triển. platform trong job dùng "webhook:<name>".
+- name: myapp
+  url: "https://myapp.local/api/notify"
+  header_name: "Authorization"
+  header_value: "Bearer <token đã lưu sẵn của webapp>"

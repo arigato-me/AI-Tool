@@ -1,0 +1,7 @@
+fastapi>=0.115
+uvicorn[standard]>=0.32
+pydantic>=2.9
+redis>=5.0
+pyyaml>=6.0
+requests>=2.32
+playwright>=1.47

@@ -1,0 +1,6 @@
+# Copy vào data/config/telegram.yaml (đã gitignore qua rule */data/) rồi điền thật.
+# bot_token: tạo qua @BotFather trên Telegram, lệnh /newbot.
+# default_chat_id: chat_id của mày với bot (nhắn /start cho bot rồi gọi
+#   https://api.telegram.org/bot<token>/getUpdates để lấy chat.id trong kết quả).
+bot_token: ""
+default_chat_id: ""
