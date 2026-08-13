@@ -11,6 +11,7 @@ Dùng `Popen` + polling `communicate(timeout=...)` theo đúng pattern khuyến 
 xong mới dừng được (xem `queue_lib.request_cancel`)."""
 from __future__ import annotations
 
+import os
 import subprocess
 import time
 from typing import Callable
@@ -19,6 +20,7 @@ POLL_INTERVAL_S = 1.0
 TIMEOUT_S = 3600
 FORBIDDEN_RETRIES = 3
 FORBIDDEN_RETRY_SLEEP_S = 3.0
+COOKIES_PATH = "/config/cookies.txt"
 
 
 class YtdlpCancelled(RuntimeError):
@@ -63,6 +65,12 @@ def _run_once(args: list[str], cwd: str, should_cancel: Callable[[], bool] | Non
 def run_ytdlp(args: list[str], cwd: str = "/downloads", should_cancel: Callable[[], bool] | None = None) -> dict:
     if not args:
         raise RuntimeError("thiếu args cho yt-dlp (vd URL, -o, ...)")
+
+    # Tự nạp cookie đăng nhập thật (YouTube/TikTok...) nếu caller chưa tự truyền --cookies —
+    # yt-dlp tự ghi lại file này sau mỗi lần chạy nên cookie xoay vòng tự refresh, không cần
+    # code thêm; cookie tự sinh ẩn danh của Douyin (khác domain) không bị ảnh hưởng.
+    if "--cookies" not in args and os.path.exists(COOKIES_PATH) and os.path.getsize(COOKIES_PATH) > 0:
+        args = ["--cookies", COOKIES_PATH, *args]
 
     result = None
     for attempt in range(1, FORBIDDEN_RETRIES + 1):

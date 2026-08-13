@@ -28,3 +28,9 @@ youtube.com:
 youtu.be:
   max_requests: 5
   window_s: 600
+
+# tiktok.com: cùng mức thận trọng với youtube.com — gọi dồn dập từ IP datacenter là nguyên
+# nhân hay gặp khiến cookie đăng nhập bị flag/invalidate, không riêng gì lỗi 503.
+tiktok.com:
+  max_requests: 5
+  window_s: 600
