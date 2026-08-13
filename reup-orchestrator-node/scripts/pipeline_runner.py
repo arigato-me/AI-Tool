@@ -706,10 +706,13 @@ def _run_pipeline_impl(
         matches = existing_matches
     else:
         ytdlp_args = list(payload.get("ytdlp_args") or [])
-        # mode="audio": ép yt-dlp tự trích + convert mp3 ngay lúc tải (ffmpeg có sẵn trong
-        # image ytdlp-node) — file glob ra dưới sẽ có đuôi .mp3 luôn, không cần bước riêng.
+        # mode="audio": chỉ trích audio (-x), KHÔNG ép --audio-format mp3 — giữ nguyên codec gốc
+        # (thường .opus với YouTube) để tránh transcode lossy 2 lần chồng nhau (tải + loudnorm
+        # bên dưới đều cần decode/encode; loudnorm là bước bắt buộc phải re-encode, ép mp3 ở đây
+        # nữa là thừa 1 lần lossy). Bug thật gặp: tải về nghe nhỏ hơn hẳn so với phát trên YouTube
+        # Music — do YT Music tự chuẩn hoá loudness lúc phát, file tải thô chưa qua bước đó.
         if mode == "audio":
-            ytdlp_args = ["-x", "--audio-format", "mp3"] + ytdlp_args
+            ytdlp_args = ["-x"] + ytdlp_args
         out_template = f"/downloads/{pipeline_id}.%(ext)s"
         ytdlp_args = ["-o", out_template] + ytdlp_args + [url]
         _run_stage("ytdlp", YTDLP_URL, {"args": ytdlp_args})
@@ -721,8 +724,16 @@ def _run_pipeline_impl(
     # mode="audio"/"video": dừng ngay sau ytdlp — không qua transcribe/translate/tts/editor.
     # Trả sớm tại đây để 3 nhánh review/dialogue/subtitle bên dưới không bị đụng.
     if mode == "audio":
+        # Chuẩn hoá loudness qua editor-node (2-pass linear loudnorm, tái dùng loudnorm_pass()
+        # sẵn có của nhánh dialogue) trước khi trả — file thô yt-dlp tải về chưa qua bước này.
+        loudnorm_in = _copy(source_video, NODES["editor"]["source"], f"{stem}_source{source_video.suffix}")
+        loudnorm_name = f"{stem}_loudnorm{source_video.suffix}"
+        _run_stage("editor_loudnorm", EDITOR_URL, {
+            "cmd": "loudnorm",
+            "params": {"input_path": f"/source/{loudnorm_in.name}", "output_path": f"/outputs/{loudnorm_name}"},
+        }, resume_check=NODES["editor"]["outputs"] / loudnorm_name)
         job_out_dir = OWN_OUTPUTS / pipeline_id
-        final_out = _copy(source_video, job_out_dir, f"{export_stem}.mp3")
+        final_out = _copy(NODES["editor"]["outputs"] / loudnorm_name, job_out_dir, f"{export_stem}{source_video.suffix}")
         return {"ok": True, "output": str(final_out), "video_name": video_name, "stages": stages}
     # mode="video": y hệt "audio" nhưng KHÔNG ép `-x --audio-format mp3` ở bước ytdlp phía trên
     # (nhánh `if mode == "audio"` riêng đó không khớp "video" nên yt-dlp tải nguyên file gốc) —

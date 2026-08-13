@@ -5,6 +5,9 @@ import StageTimeline from "../components/StageTimeline";
 import { formatDuration, totalElapsedS } from "../lib/jobDuration";
 
 const IMAGE_EXT_RE = /\.(jpe?g|png|bmp|tiff?|webp)$/i;
+// mode="audio" giữ nguyên codec gốc yt-dlp trả về sau bước loudnorm (không luôn ép .mp3 nữa) —
+// mode="book" vẫn luôn .mp3.
+const AUDIO_EXTS = [".mp3", ".m4a", ".opus", ".ogg"];
 
 export default function JobDetail({ pipelineId }: { pipelineId: string }) {
   const [job, setJob] = useState<PipelineJob | null>(null);
@@ -88,18 +91,33 @@ export default function JobDetail({ pipelineId }: { pipelineId: string }) {
 
   useEffect(() => {
     let cancelled = false;
+    let loadedOnce = false;
+    let t: ReturnType<typeof setInterval> | undefined;
     async function load() {
       try {
         const res = await getPipeline(pipelineId);
         if (cancelled) return;
-        if (res.ok) setJob(res);
-        else setError(res.error || "Không tải được job");
+        if (res.ok) {
+          setJob(res);
+          loadedOnce = true;
+          // Job đã ở trạng thái cuối — dừng poll. Poll vô thời hạn từng gây tranh
+          // connection với request tải file lớn (video/audio), khiến Safari abort
+          // fetch và báo "TypeError: Load failed" dù file vẫn tải được bình thường
+          // (thẻ <a download> là cơ chế native, không qua fetch).
+          if (["finished", "failed", "cancelled"].includes(res.status) && t) {
+            clearInterval(t);
+          }
+        } else {
+          setError(res.error || "Không tải được job");
+        }
       } catch (err) {
-        if (!cancelled) setError(String(err));
+        // Sau khi đã có job, lỗi poll thoáng qua (vd tranh connection lúc tải file)
+        // không nên đè lên UI đang hiển thị bình thường.
+        if (!cancelled && !loadedOnce) setError(String(err));
       }
     }
     load();
-    const t = setInterval(load, 3000);
+    t = setInterval(load, 3000);
     return () => {
       cancelled = true;
       clearInterval(t);
@@ -225,18 +243,22 @@ export default function JobDetail({ pipelineId }: { pipelineId: string }) {
       })()}
 
       {job && job.status === "finished" && job.result?.output && (() => {
-        const isAudio = job.result.output.toLowerCase().endsWith(".mp3");
+        // Đuôi audio: không chỉ .mp3 nữa — mode="audio" giờ giữ nguyên codec gốc yt-dlp trả về
+        // (thường .opus với YouTube) sau bước loudnorm, thay vì luôn ép .mp3. mode="book" vẫn
+        // luôn .mp3 (không đổi) — check theo đuôi file (không theo mode) để đúng cho cả 2 nhánh.
+        const outputLowerMain = job.result.output.toLowerCase();
+        const isAudio = AUDIO_EXTS.some((ext) => outputLowerMain.endsWith(ext));
         // Tên file thật (vd "video_<tên>.webm" ở nhánh mode="video" — không luôn là
         // .mp4) — trước đây ghi cứng "Tải final.mp4" cho mọi nhánh không phải audio, sai
         // nhãn khi output không phải .mp4 (bug thật gặp khi test nhánh video qua UI).
         const fileName = job.result.output.split("/").pop() || job.result.output;
         return (
           <div className="card">
-            <p className="stage-detail">{isAudio ? "Audio mp3:" : "Video final:"}</p>
+            <p className="stage-detail">{isAudio ? "Audio final:" : "Video final:"}</p>
             {isAudio ? (
-              <audio controls src={outputUrl(job.result.output)} style={{ width: "100%" }} />
+              <audio controls preload="none" src={outputUrl(job.result.output)} style={{ width: "100%" }} />
             ) : (
-              <video controls src={outputUrl(job.result.output)} />
+              <video controls preload="none" src={outputUrl(job.result.output)} />
             )}
             <p>
               <a href={outputUrl(job.result.output)} download>
@@ -286,15 +308,16 @@ export default function JobDetail({ pipelineId }: { pipelineId: string }) {
       )}
 
       {job && job.status === "finished" && job.result?.output && (() => {
-        // mp3: chỉ mode="audio" (khớp gate cũ ở backend, KHÔNG mở rộng sang mp3 của mode khác
-        // vd book). Video: mọi nhánh xuất mp4/webm/mkv (review/dialogue/subtitle/video/mix) —
-        // xem reup-orchestrator-node/scripts/api.py::trim_pipeline_output.
+        // Đuôi audio (mp3/m4a/opus/ogg): chỉ mode="audio" (khớp gate cũ ở backend, KHÔNG mở
+        // rộng sang mode khác cũng xuất đuôi audio vd book). Video: mọi nhánh xuất mp4/webm/mkv
+        // (review/dialogue/subtitle/video/mix) — xem
+        // reup-orchestrator-node/scripts/api.py::trim_pipeline_output.
         const outputLower = job.result.output.toLowerCase();
-        const isMp3 = outputLower.endsWith(".mp3");
-        const canTrim = (isMp3 && job.payload?.mode === "audio")
+        const isAudioExt = AUDIO_EXTS.some((ext) => outputLower.endsWith(ext));
+        const canTrim = (isAudioExt && job.payload?.mode === "audio")
           || outputLower.endsWith(".mp4") || outputLower.endsWith(".webm") || outputLower.endsWith(".mkv");
         if (!canTrim) return null;
-        const trimOutputIsAudio = job.trim_output?.toLowerCase().includes(".mp3");
+        const trimOutputIsAudio = AUDIO_EXTS.some((ext) => job.trim_output?.toLowerCase().includes(ext));
         return (
           <div className="card">
             <p className="stage-detail">
@@ -333,9 +356,9 @@ export default function JobDetail({ pipelineId }: { pipelineId: string }) {
               <>
                 <p className="stage-detail">Bản đã cắt:</p>
                 {trimOutputIsAudio ? (
-                  <audio controls src={outputUrl(job.trim_output)} style={{ width: "100%" }} />
+                  <audio controls preload="none" src={outputUrl(job.trim_output)} style={{ width: "100%" }} />
                 ) : (
-                  <video controls src={outputUrl(job.trim_output)} style={{ width: "100%" }} />
+                  <video controls preload="none" src={outputUrl(job.trim_output)} style={{ width: "100%" }} />
                 )}
                 <p>
                   <a href={outputUrl(job.trim_output)} download>

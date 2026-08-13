@@ -270,14 +270,17 @@ def cancel_pipeline(pipeline_id: str) -> dict:
 
 @app.post("/pipelines/{pipeline_id}/trim")
 def trim_pipeline_output(pipeline_id: str, req: TrimBody) -> dict:
-    """Cắt đầu/đuôi output (mp3 HOẶC video mp4/webm/mkv) của 1 job đã 'finished'. Chạy ffmpeg
-    trực tiếp tại đây (không qua job queue), ghi file `<tên>_trimmed<đuôi gốc>` cạnh file gốc —
-    không đụng file gốc, gọi lại nhiều lần (đổi start/end thử) chỉ ghi đè đúng file `_trimmed`.
+    """Cắt đầu/đuôi output (audio mp3/m4a/opus/ogg HOẶC video mp4/webm/mkv) của 1 job đã
+    'finished'. Chạy ffmpeg trực tiếp tại đây (không qua job queue), ghi file
+    `<tên>_trimmed<đuôi gốc>` cạnh file gốc — không đụng file gốc, gọi lại nhiều lần (đổi
+    start/end thử) chỉ ghi đè đúng file `_trimmed`.
 
     Định theo ĐUÔI FILE output, không theo `mode` — tự đúng cho mọi nhánh xuất video (review/
     dialogue/subtitle/video/mix, kể cả mode mới thêm sau này) mà không cần liệt kê cứng danh
-    sách mode. Riêng mp3: GIỮ NGUYÊN gate cũ `mode="audio"` — không mở rộng cho mp3 của mode
-    khác (vd mode="book" cũng xuất mp3, cố tình KHÔNG cho trim ở đây, ngoài phạm vi yêu cầu)."""
+    sách mode. Riêng nhóm đuôi audio (mp3/m4a/opus/ogg — mode="audio" giờ giữ nguyên codec gốc
+    yt-dlp trả về thay vì luôn ép mp3): GIỮ NGUYÊN gate cũ `mode="audio"` — không mở rộng cho
+    mode khác cũng xuất các đuôi này (vd mode="book" xuất mp3, cố tình KHÔNG cho trim ở đây,
+    ngoài phạm vi yêu cầu)."""
     job = q.get_job(conn, pipeline_id)
     if job is None:
         return {"ok": False, "error": "pipeline không tồn tại hoặc đã hết hạn (TTL 48h)"}
@@ -288,9 +291,9 @@ def trim_pipeline_output(pipeline_id: str, req: TrimBody) -> dict:
     if not output:
         return {"ok": False, "error": "job này không có output để cắt"}
     ext = Path(output).suffix.lower()
-    if ext == ".mp3":
+    if ext in (".mp3", ".m4a", ".opus", ".ogg"):
         if payload.get("mode") != "audio":
-            return {"ok": False, "error": "chỉ hỗ trợ cắt mp3 cho job nhánh mode='audio'"}
+            return {"ok": False, "error": f"chỉ hỗ trợ cắt {ext} cho job nhánh mode='audio'"}
     elif ext not in (".mp4", ".webm", ".mkv"):
         return {"ok": False, "error": f"định dạng không hỗ trợ cắt: {ext or '(không rõ)'}"}
 

@@ -25,7 +25,7 @@ ROLE = "editor-worker"
 conn = redis_lib.Redis.from_url(REDIS_URL)
 app = FastAPI()
 
-VALID_CMDS = {"edit", "srt", "mix-dialogue", "mix-music", "concat-video", "concat-audio", "image-to-video"}
+VALID_CMDS = {"edit", "srt", "mix-dialogue", "mix-music", "concat-video", "concat-audio", "image-to-video", "loudnorm"}
 
 
 class EditJobRequest(BaseModel):
