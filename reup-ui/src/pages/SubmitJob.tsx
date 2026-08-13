@@ -504,13 +504,13 @@ export default function SubmitJob({ initial }: SubmitJobProps) {
       {isBook && (
         <label>
           <span className="field-label-row">
-            File sách (pdf/docx/pptx/xlsx/ảnh — chọn nhiều ảnh nếu chụp mỗi trang 1 ảnh)
+            File sách (pdf/docx/pptx/xlsx/md/txt/ảnh — chọn nhiều ảnh nếu chụp mỗi trang 1 ảnh)
             <FieldInfo text="PDF có text layer (không phải scan) được trích thẳng, không tốn GPU. Trang scan/ảnh sẽ tự OCR. Chọn nhiều file thì gộp theo đúng thứ tự đã chọn (kéo-thả để sắp lại thứ tự trước khi chọn nếu trình duyệt hỗ trợ)." />
           </span>
           <input
             type="file"
             multiple
-            accept=".pdf,.docx,.pptx,.xlsx,image/*"
+            accept=".pdf,.docx,.pptx,.xlsx,.md,.markdown,.txt,image/*"
             onChange={(e) => setDocumentFiles(Array.from(e.target.files ?? []))}
             required
           />

@@ -31,6 +31,7 @@ OcrFn = Callable[[str, str], list[dict]]
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".webp"}
 MARKITDOWN_EXTS = {".docx", ".pptx", ".xlsx"}
+TEXT_EXTS = {".md", ".markdown", ".txt"}
 CHARS_PER_SECOND = 14.0  # ước lượng tốc độ đọc — chỉ dùng làm gợi ý độ dài câu, không phải audio thật
 MIN_SEGMENT_DURATION_S = 1.0
 SCAN_CHAR_THRESHOLD = 20  # < ký tự trên trang PDF => nghi trang scan/ảnh, không tin text layer
@@ -110,6 +111,11 @@ def _extract_image(path: Path, source_lang: str, ocr_fn: OcrFn) -> list[str]:
     return [page_text] if page_text.strip() else []
 
 
+def _extract_text_file(path: Path) -> list[str]:
+    content = path.read_text(encoding="utf-8", errors="ignore")
+    return _split_paragraphs(content)
+
+
 def extract_paragraphs(input_path: str, source_lang: str, ocr_fn: OcrFn) -> list[str]:
     path = Path(input_path)
     ext = path.suffix.lower()
@@ -119,7 +125,11 @@ def extract_paragraphs(input_path: str, source_lang: str, ocr_fn: OcrFn) -> list
         return _extract_docx_like(path)
     if ext in IMAGE_EXTS:
         return _extract_image(path, source_lang, ocr_fn)
-    raise RuntimeError(f"định dạng không hỗ trợ: {ext!r} (chỉ nhận .pdf/.docx/.pptx/.xlsx/ảnh)")
+    if ext in TEXT_EXTS:
+        return _extract_text_file(path)
+    raise RuntimeError(
+        f"định dạng không hỗ trợ: {ext!r} (chỉ nhận .pdf/.docx/.pptx/.xlsx/.md/.markdown/.txt/ảnh)"
+    )
 
 
 def _build_segments(paragraphs: list[str]) -> tuple[list[dict], float]:
